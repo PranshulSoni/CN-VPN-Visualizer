@@ -1,0 +1,2467 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description"
+    content="Follow one request through all seven OSI layers. A minimal, step-by-step comparison of a VPN tunnel and a direct network.">
+  <title>Packet / Path — VPN Visualizer</title>
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23141715'/%3E%3Cpath d='M7 11h18M7 21h18' stroke='%239edbb7' stroke-width='3'/%3E%3C/svg%3E">
+  <script>
+    try { if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (_) { }
+  </script>
+  <style>
+    /* Default Light / White Mode */
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --bg-subtle: #f8fafc;
+      --bg-card: #f1f5f9;
+      --bg-input: #ffffff;
+      --bg-dialog: #ffffff;
+      --backdrop: rgba(15, 23, 42, 0.5);
+      --ink: #090d16;
+      --ink-code: #0f172a;
+      --muted: #475569;
+      --line: #cbd5e1;
+      --line-input: #94a3b8;
+      --line-active: #64748b;
+      --line-button: #94a3b8;
+      --line-dialog: #cbd5e1;
+      --btn-hover: #f1f5f9;
+      --step-done: #475569;
+      --step-num: #475569;
+      --error: #dc2626;
+      --vpn: #047857;
+      --direct: #b45309;
+      --soft-opacity: 0.14;
+      --mono: ui-monospace, 'Cascadia Code', 'Liberation Mono', monospace;
+      --sans: 'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    }
+
+    /* Optional Dark Mode */
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #141715;
+      --bg-subtle: #1a1e1a;
+      --bg-card: #141715;
+      --bg-input: #232923;
+      --bg-dialog: #1a1e1a;
+      --backdrop: #080c09bb;
+      --ink: #e8e9e2;
+      --ink-code: #c4cdc0;
+      --muted: #9a9f98;
+      --line: #343a34;
+      --line-input: #535b52;
+      --line-active: #586156;
+      --line-button: #485244;
+      --line-dialog: #50594e;
+      --btn-hover: #232923;
+      --step-done: #747f72;
+      --step-num: #778174;
+      --error: #f1a79b;
+      --vpn: #a5ddbc;
+      --direct: #d9b584;
+      --soft-opacity: 0.07;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.5 var(--sans);
+      -webkit-font-smoothing: antialiased
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+      -webkit-tap-highlight-color: transparent
+    }
+
+    button,
+    select,
+    textarea {
+      font: inherit;
+      color: inherit
+    }
+
+    button {
+      background: none;
+      border: 1px solid transparent;
+      padding: 9px 14px;
+      cursor: pointer;
+      border-radius: 3px;
+      white-space: nowrap
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--btn-hover)
+    }
+
+    button:disabled {
+      opacity: .3;
+      cursor: default
+    }
+
+    button:focus-visible,
+    a:focus-visible,
+    summary:focus-visible {
+      outline: 2px solid var(--vpn);
+      outline-offset: 5px
+    }
+
+    a {
+      color: inherit
+    }
+
+    .shell {
+      max-width: 1800px;
+      margin: auto;
+      padding: 0 44px;
+      height: 100svh;
+      min-height: 680px;
+      display: flex;
+      flex-direction: column
+    }
+
+    .topbar {
+      height: 83px;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1.5px solid var(--line)
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 21px;
+      letter-spacing: -.8px;
+      text-decoration: none
+    }
+
+    .brand>span:first-child {
+      color: var(--vpn);
+      margin: 0 3px;
+      font-weight: 500
+    }
+
+    .brand-note {
+      font: 600 10px var(--mono);
+      letter-spacing: 1.4px;
+      margin-left: 24px;
+      color: var(--muted)
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px
+    }
+
+    .simulation,
+    .eyebrow {
+      font: 600 10px/1.5 var(--mono);
+      letter-spacing: 1.5px;
+      color: var(--muted)
+    }
+
+    .simulation {
+      font-size: 9.5px;
+      margin-right: 20px
+    }
+
+    .top-actions button {
+      font-size: 12px;
+      font-weight: 500
+    }
+
+    .top-actions button span {
+      margin-left: 12px
+    }
+
+    .divider {
+      color: var(--line-active);
+      margin: 0 10px
+    }
+
+    .bottom-note {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 40px;
+      flex-shrink: 0;
+      color: var(--muted);
+      font: 500 10px var(--mono)
+    }
+
+    [hidden] {
+      display: none !important
+    }
+
+    .mono {
+      font-family: var(--mono)
+    }
+
+    .primary {
+      background: var(--ink);
+      color: var(--bg);
+      border: 1.5px solid var(--ink);
+      min-width: 104px;
+      font-weight: 600
+    }
+
+    .primary:hover:not(:disabled) {
+      background: var(--vpn);
+      border-color: var(--vpn)
+    }
+
+    .eyebrow {
+      margin: 0 0 18px
+    }
+
+    .intro {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      align-items: center;
+      column-gap: 9%;
+      position: relative;
+      padding-bottom: 60px
+    }
+
+    .intro h1 {
+      font-size: clamp(42px, 4.9vw, 78px);
+      line-height: 1.06;
+      font-weight: 400;
+      letter-spacing: -3.4px;
+      margin: 0 0 28px
+    }
+
+    .intro-description {
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 14px;
+      margin-bottom: 36px
+    }
+
+    .intro-copy {
+      padding: 45px 0
+    }
+
+    .intro form {
+      max-width: 420px
+    }
+
+    .intro form>.eyebrow {
+      display: block;
+      margin-bottom: 10px
+    }
+
+    textarea {
+      width: 100%;
+      resize: vertical;
+      min-height: 64px;
+      max-height: 120px;
+      padding: 10px 12px;
+      background: var(--bg-card);
+      border: 1.5px solid var(--line-input);
+      font: 500 16px/1.5 var(--mono);
+      border-radius: 4px;
+      color: var(--ink);
+      transition: border-color .15s, box-shadow .15s
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--vpn);
+      box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.15)
+    }
+
+    .input-options {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      gap: 10px
+    }
+
+    select {
+      background: var(--bg-card);
+      border: 1px solid var(--line-input);
+      border-radius: 3px;
+      font: 500 11px var(--mono);
+      padding: 7px 10px;
+      max-width: 100%;
+      color: var(--ink)
+    }
+
+    .file-label {
+      position: relative;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      white-space: nowrap;
+      text-decoration: underline;
+      text-underline-offset: 4px
+    }
+
+    .file-label input {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      left: 0;
+      top: 0;
+      cursor: pointer
+    }
+
+    .file-label:focus-within {
+      outline: 2px solid var(--vpn)
+    }
+
+    .start-row {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      margin-top: 25px
+    }
+
+    .start-row button {
+      display: flex;
+      justify-content: space-between;
+      gap: 46px;
+      padding: 13px 18px
+    }
+
+    .start-row>span {
+      font: 500 10.5px/1.5 var(--mono);
+      color: var(--muted)
+    }
+
+    .error {
+      color: var(--error);
+      font-size: 12px;
+      min-height: 18px;
+      margin: 10px 0 0
+    }
+
+    .intro-figure {
+      position: relative;
+      padding-left: 60px;
+      padding-top: 15px
+    }
+
+    .origin-label {
+      position: absolute;
+      top: 0;
+      left: 0;
+      font: 600 10px var(--mono);
+      letter-spacing: 1px;
+      color: var(--muted)
+    }
+
+    .origin-mark {
+      position: absolute;
+      left: 15px;
+      top: 88px;
+      height: 155px;
+      width: 2px;
+      background: var(--line-active)
+    }
+
+    .origin-mark span {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      left: -3px;
+      top: 0;
+      background: var(--ink);
+      border-radius: 1px
+    }
+
+    .origin-mark span:nth-child(2) {
+      top: 78px
+    }
+
+    .origin-mark span:nth-child(3) {
+      top: 155px
+    }
+
+    .intro-route {
+      color: var(--vpn);
+      margin: 32px 0 65px
+    }
+
+    .intro-route.direct {
+      color: var(--direct)
+    }
+
+    .route-label {
+      font: 600 10.5px var(--mono);
+      letter-spacing: 1.3px
+    }
+
+    .intro-line {
+      height: 65px;
+      position: relative;
+      border-bottom: 1.5px solid currentColor;
+      display: flex;
+      justify-content: space-between;
+      align-items: end
+    }
+
+    .intro-packet {
+      font: 600 12px var(--mono);
+      padding: 8px 14px;
+      border: 1.5px solid currentColor;
+      background: var(--bg-card);
+      border-radius: 3px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      transform: translateY(50%);
+      margin-left: 10px
+    }
+
+    .gateway-mark {
+      border: 1.5px dashed var(--vpn);
+      font: 600 10.5px var(--mono);
+      padding: 22px 26px;
+      border-radius: 3px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transform: translateY(50%);
+      background: var(--bg-card)
+    }
+
+    .endpoint {
+      font-size: 22px;
+      background: var(--bg);
+      transform: translateY(50%);
+      padding-left: 15px
+    }
+
+    .intro-route p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 31px;
+      font-weight: 500
+    }
+
+    .figure-note {
+      font: 500 10.5px var(--mono);
+      color: var(--muted);
+      margin-top: 6px
+    }
+
+    .intro-bottom {
+      position: absolute;
+      bottom: 16px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      font: 500 10px var(--mono);
+      color: var(--muted);
+      border-top: 1.5px solid var(--line);
+      padding-top: 17px
+    }
+
+    #presentation {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0
+    }
+
+    .chapter-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 40px;
+      min-height: 150px;
+      padding: 28px 0 22px
+    }
+
+    .chapter-heading .eyebrow {
+      margin: 0 0 6px
+    }
+
+    .chapter-heading h1 {
+      font-size: clamp(32px, 3.5vw, 52px);
+      font-weight: 400;
+      letter-spacing: -1.8px;
+      margin: 0;
+      line-height: 1.15
+    }
+
+    .heading-description {
+      max-width: 535px;
+      width: 48%
+    }
+
+    .heading-description h2 {
+      font-weight: 600;
+      font-size: 17px;
+      margin: 0 0 7px;
+      color: var(--ink)
+    }
+
+    .heading-description p {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.7
+    }
+
+    .viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      border-top: 1.5px solid var(--line);
+      border-bottom: 1.5px solid var(--line);
+      position: relative
+    }
+
+    .track {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      transition: transform .65s cubic-bezier(.22, .7, .2, 1);
+      will-change: transform
+    }
+
+    .chapter {
+      flex: 0 0 100%;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      visibility: hidden;
+      transition: visibility .65s
+    }
+
+    .chapter.active,
+    .chapter.leaving {
+      visibility: visible
+    }
+
+    .lane {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 160px minmax(0, 1fr);
+      align-items: center;
+      padding: 20px 0 22px;
+      color: var(--vpn)
+    }
+
+    .lane.direct {
+      color: var(--direct);
+      border-top: 1.5px solid var(--line)
+    }
+
+    .lane-label {
+      align-self: start;
+      padding-top: 7px
+    }
+
+    .lane-label h3 {
+      font-size: 13.5px;
+      margin: 0;
+      font-weight: 600;
+      letter-spacing: .1px;
+      display: flex;
+      align-items: center;
+      gap: 9px
+    }
+
+    .lane-label h3:before {
+      content: '';
+      display: block;
+      width: 6px;
+      height: 6px;
+      background: currentColor;
+      border-radius: 50%
+    }
+
+    .lane-label p {
+      font: 500 9.5px/1.7 var(--mono);
+      color: var(--muted);
+      margin: 10px 0 0;
+      max-width: 130px
+    }
+
+    .lane-content {
+      min-width: 0;
+      position: relative;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center
+    }
+
+    .diagram {
+      height: 130px;
+      min-height: 80px;
+      width: 100%;
+      overflow: visible
+    }
+
+    .diagram text {
+      font-family: var(--mono);
+      fill: currentColor;
+      font-weight: 500
+    }
+
+    .diagram .dim {
+      fill: var(--muted);
+      font-weight: 500
+    }
+
+    .diagram .stroke {
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.5
+    }
+
+    .diagram .faint {
+      stroke: var(--line-active);
+      fill: none;
+      stroke-width: 1.2;
+      stroke-dasharray: 4 4
+    }
+
+    .diagram .box {
+      stroke: currentColor;
+      fill: var(--bg-card);
+      stroke-width: 1.5;
+      rx: 3px
+    }
+
+    .diagram .soft {
+      fill: currentColor;
+      opacity: var(--soft-opacity, 0.14)
+    }
+
+    .diagram .packet {
+      animation: arrive .5s cubic-bezier(.2, .7, .3, 1) both
+    }
+
+    .lane-caption {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+      margin: 13px 0 0;
+      max-width: 850px
+    }
+
+    .lane-caption strong {
+      color: var(--ink);
+      font-weight: 600
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      height: 78px;
+      flex-shrink: 0
+    }
+
+    .control-left {
+      display: flex;
+      align-items: center;
+      gap: 20px
+    }
+
+    .control-left button {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      padding-left: 0
+    }
+
+    .control-left span {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted)
+    }
+
+    .navigation {
+      display: flex;
+      gap: 10px
+    }
+
+    .navigation button {
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 108px
+    }
+
+    .navigation button:first-child {
+      border: 1.5px solid var(--line-active);
+      color: var(--ink);
+      background: var(--bg-card)
+    }
+
+    .microsteps {
+      display: flex;
+      gap: 6px
+    }
+
+    .microsteps button {
+      width: 24px;
+      min-width: 0;
+      height: 20px;
+      padding: 8px 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      position: relative
+    }
+
+    .microsteps button:before {
+      content: '';
+      height: 2px;
+      background: var(--line-active);
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 9px
+    }
+
+    .microsteps button.current:before {
+      background: var(--ink);
+      height: 3px;
+      top: 8px
+    }
+
+    .microsteps button.done:before {
+      background: var(--step-done)
+    }
+
+    .layer-nav {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1.5px solid var(--line);
+      flex-shrink: 0;
+      gap: 2px;
+      height: 53px;
+      align-items: stretch
+    }
+
+    .layer-nav button {
+      border: 0;
+      border-radius: 0;
+      color: var(--muted);
+      font-size: 10.5px;
+      font-weight: 500;
+      padding: 12px 7px;
+      position: relative
+    }
+
+    .layer-nav button span {
+      font: 600 9.5px var(--mono);
+      margin-right: 7px;
+      color: var(--step-num)
+    }
+
+    .layer-nav button[aria-current="step"] {
+      color: var(--ink);
+      font-weight: 600
+    }
+
+    .layer-nav button[aria-current="step"]:before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -1px;
+      height: 3px;
+      background: var(--vpn)
+    }
+
+    .receipt-preview {
+      font: 500 12px var(--mono);
+      color: var(--ink);
+      position: absolute;
+      left: 65%;
+      right: 0;
+      bottom: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .chapter.active .delivered-check {
+      animation: arrive .5s both
+    }
+
+    dialog {
+      max-width: 800px;
+      width: calc(100% - 32px);
+      max-height: 90svh;
+      background: var(--bg-dialog);
+      color: var(--ink);
+      border: 1.5px solid var(--line-dialog);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+      padding: 30px 36px;
+      overscroll-behavior: contain;
+      border-radius: 6px
+    }
+
+    dialog::backdrop {
+      background: var(--backdrop);
+      backdrop-filter: blur(4px)
+    }
+
+    .inspect-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+      position: sticky;
+      top: -30px;
+      background: var(--bg-dialog);
+      padding: 10px 0 15px;
+      z-index: 1
+    }
+
+    .inspect-header .eyebrow {
+      margin-bottom: 5px
+    }
+
+    .inspect-header h2 {
+      margin: 0;
+      font-weight: 500;
+      font-size: 30px;
+      letter-spacing: -.8px
+    }
+
+    .inspect-header button {
+      font-size: 12px;
+      font-weight: 500;
+      border: 1.5px solid var(--line);
+      background: var(--bg-card)
+    }
+
+    .inspect-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.8
+    }
+
+    dialog h3 {
+      font: 600 10.5px var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin: 28px 0 12px;
+      color: var(--muted)
+    }
+
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 500 11.5px/1.8 var(--mono);
+      margin: 0
+    }
+
+    #inspect-data {
+      border-top: 1.5px solid var(--line);
+      border-bottom: 1.5px solid var(--line);
+      padding: 18px 12px;
+      color: var(--ink-code);
+      max-height: 280px;
+      overflow: auto;
+      background: var(--bg-subtle);
+      border-radius: 4px
+    }
+
+    .experiments {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px
+    }
+
+    .experiments button {
+      border: 1.5px solid var(--line-button);
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--bg-card);
+      color: var(--ink)
+    }
+
+    .experiments button.selected {
+      background: var(--vpn);
+      color: var(--bg);
+      border-color: var(--vpn)
+    }
+
+    #lab-result {
+      margin-top: 18px;
+      color: var(--vpn);
+      min-height: 24px;
+      font-weight: 600
+    }
+
+    #lab-visual {
+      color: var(--vpn)
+    }
+
+    #lab-visual .diagram {
+      margin-top: 16px;
+      max-height: 130px
+    }
+
+    details {
+      border-top: 1.5px solid var(--line);
+      margin-top: 25px;
+      padding-top: 16px;
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.8
+    }
+
+    summary {
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink)
+    }
+
+    details p {
+      margin-bottom: 0
+    }
+
+    .inspect-form-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 15px;
+      font: 500 11px var(--mono)
+    }
+
+    .inspect-form-row input {
+      background: var(--bg-card);
+      color: var(--ink);
+      border: 1.5px solid var(--line-input);
+      border-radius: 3px;
+      padding: 6px;
+      max-width: 90px
+    }
+
+    noscript {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      padding: 50px;
+      font-size: 24px
+    }
+
+    @keyframes arrive {
+      from {
+        opacity: 0;
+        transform: translateX(-34px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0)
+      }
+    }
+
+    @media(min-height:900px) and (min-width:900px) {
+      .diagram {
+        height: 170px
+      }
+
+      .lane {
+        padding-top: 30px;
+        padding-bottom: 30px
+      }
+
+      .chapter-heading {
+        min-height: 175px
+      }
+
+      .lane-caption {
+        font-size: 13px
+      }
+
+      .lane-label {
+        padding-top: 15px
+      }
+    }
+
+    @media(max-width:1100px) {
+      .shell {
+        padding: 0 25px
+      }
+
+      .brand-note,
+      .simulation {
+        display: none
+      }
+
+      .lane {
+        grid-template-columns: 120px minmax(0, 1fr)
+      }
+
+      .layer-nav button {
+        font-size: 9px;
+        padding: 12px 4px
+      }
+
+      .layer-nav button span {
+        display: none
+      }
+
+      .intro {
+        gap: 7%
+      }
+
+      .intro h1 {
+        letter-spacing: -2px
+      }
+
+      .intro-figure {
+        padding-left: 35px
+      }
+
+      .heading-description {
+        width: 52%
+      }
+
+      .chapter-heading {
+        gap: 20px
+      }
+    }
+
+    @media(max-width:650px) {
+      .shell {
+        padding: 0 19px;
+        min-height: 750px
+      }
+
+      .topbar {
+        height: 65px
+      }
+
+      .brand {
+        font-size: 18px
+      }
+
+      .top-actions {
+        gap: 5px
+      }
+
+      .top-actions button {
+        font-size: 10px;
+        padding: 7px
+      }
+
+      .top-actions button span {
+        margin-left: 4px
+      }
+
+      .intro {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+        padding-bottom: 65px
+      }
+
+      .intro-copy {
+        padding: 34px 0 0
+      }
+
+      .intro h1 {
+        font-size: 45px;
+        letter-spacing: -2px;
+        margin-bottom: 18px
+      }
+
+      .intro .eyebrow {
+        font-size: 9px
+      }
+
+      .intro-description {
+        font-size: 12px;
+        margin: 0 0 24px
+      }
+
+      .intro form {
+        max-width: none
+      }
+
+      .intro-figure {
+        padding-left: 65px;
+        padding-top: 12px;
+        margin: 25px 0
+      }
+
+      .intro-route {
+        margin: 10px 0 35px
+      }
+
+      .intro-line {
+        height: 40px
+      }
+
+      .intro-route p {
+        margin-top: 24px
+      }
+
+      .gateway-mark {
+        padding: 15px 18px
+      }
+
+      .origin-label {
+        font-size: 8px;
+        top: 0
+      }
+
+      .origin-mark {
+        top: 52px;
+        height: 116px
+      }
+
+      .origin-mark span:nth-child(2) {
+        top: 58px
+      }
+
+      .origin-mark span:nth-child(3) {
+        top: 116px
+      }
+
+      .figure-note {
+        font-size: 9px
+      }
+
+      .intro-bottom {
+        font-size: 9px;
+        gap: 20px
+      }
+
+      .intro-bottom>span:first-child {
+        display: none
+      }
+
+      .bottom-note {
+        font-size: 8px;
+        height: 33px
+      }
+
+      #keyboard-note {
+        display: none
+      }
+
+      .chapter-heading {
+        display: block;
+        min-height: 167px;
+        padding: 20px 0 18px
+      }
+
+      .chapter-heading h1 {
+        font-size: 33px;
+        letter-spacing: -1px
+      }
+
+      .chapter-heading .eyebrow {
+        font-size: 8px
+      }
+
+      .heading-description {
+        width: 100%;
+        max-width: none;
+        margin-top: 13px
+      }
+
+      .heading-description h2 {
+        font-size: 13px;
+        margin-bottom: 5px
+      }
+
+      .heading-description p {
+        font-size: 10px;
+        line-height: 1.6
+      }
+
+      .lane {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px 0;
+        gap: 8px
+      }
+
+      .lane-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0
+      }
+
+      .lane-label h3 {
+        font-size: 11px
+      }
+
+      .lane-label p {
+        margin: 0;
+        font-size: 8px;
+        max-width: none
+      }
+
+      .lane-content {
+        flex: 1;
+        min-height: 100px
+      }
+
+      .diagram {
+        height: 108px;
+        min-height: 80px
+      }
+
+      .lane-caption {
+        font-size: 10px;
+        margin-top: 4px;
+        line-height: 1.6
+      }
+
+      .controls {
+        height: 65px;
+        gap: 5px
+      }
+
+      .control-left {
+        gap: 9px
+      }
+
+      .control-left button {
+        font-size: 9px;
+        padding-right: 0
+      }
+
+      .control-left span {
+        font-size: 8px
+      }
+
+      .navigation {
+        gap: 6px
+      }
+
+      .navigation button {
+        min-width: 62px;
+        font-size: 10px;
+        padding: 9px
+      }
+
+      .navigation button:first-child span {
+        display: none
+      }
+
+      .navigation button:first-child {
+        min-width: 35px
+      }
+
+      .microsteps {
+        gap: 3px
+      }
+
+      .microsteps button {
+        width: 12px
+      }
+
+      .layer-nav {
+        height: 70px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0
+      }
+
+      .layer-nav button {
+        padding: 7px 2px;
+        font-size: 8px
+      }
+
+      .layer-nav button[aria-current="step"]:before {
+        left: 10px;
+        right: 10px
+      }
+
+      .receipt-preview {
+        font-size: 9px;
+        left: 45%
+      }
+
+      dialog {
+        padding: 20px
+      }
+
+      .inspect-header {
+        top: -20px
+      }
+
+      .inspect-header h2 {
+        font-size: 25px
+      }
+
+      .inspect-note {
+        font-size: 11px
+      }
+    }
+
+    @media(prefers-reduced-motion:reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important
+      }
+    }
+
+    .skip-link {
+      position: fixed;
+      left: 20px;
+      top: -100px;
+      z-index: 20;
+      background: var(--ink);
+      color: var(--bg);
+      padding: 12px
+    }
+
+    .skip-link:focus {
+      top: 10px
+    }
+
+    button,
+    a,
+    select {
+      touch-action: manipulation
+    }
+
+    .mono {
+      font-variant-numeric: tabular-nums
+    }
+
+    h1,
+    h2 {
+      text-wrap: balance
+    }
+
+    .lane {
+      grid-template-rows: minmax(0, 1fr)
+    }
+
+    .lane-content {
+      min-height: 0
+    }
+
+    .lane-diagram {
+      flex: 1;
+      min-height: 0;
+      line-height: 0;
+      display: flex;
+      align-items: center
+    }
+
+    .diagram {
+      display: block;
+      height: 100%;
+      min-height: 0
+    }
+
+    .lane-caption {
+      flex-shrink: 0
+    }
+
+    #remove-file {
+      font-size: 10px;
+      padding: 3px;
+      color: var(--muted);
+      text-decoration: underline
+    }
+
+    .shell {
+      padding-left: max(19px, env(safe-area-inset-left), 3vw);
+      padding-right: max(19px, env(safe-area-inset-right), 3vw)
+    }
+
+    @media(max-width:650px) {
+      .lane-label {
+        align-self: stretch
+      }
+
+      .lane-content {
+        height: auto;
+        min-height: 0
+      }
+
+      .lane-diagram {
+        min-height: 80px
+      }
+
+      .diagram {
+        height: 110px
+      }
+
+      .input-options {
+        gap: 8px
+      }
+
+      .start-row {
+        gap: 12px
+      }
+
+      .start-row>span {
+        font-size: 9px
+      }
+    }
+
+    .assignment-checklist {
+      list-style: none;
+      padding: 0;
+      margin: 14px 0
+    }
+
+    .assignment-checklist li {
+      margin: 9px 0
+    }
+
+    #theme-toggle {
+      font: 600 11px var(--mono);
+      padding: 8px 12px;
+      border: 1.5px solid var(--line-active);
+      color: var(--ink);
+      background: var(--bg-card);
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    #theme-toggle:hover {
+      background: var(--btn-hover);
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+  </style>
+</head>
+
+<body>
+  <a id="skip-link" class="skip-link" href="#intro">Skip to visualization</a>
+  <div class="shell">
+    <header class="topbar">
+      <a id="home" class="brand" href="#intro" aria-label="Packet Path home">packet <span>/</span> path<span
+          class="brand-note">COMPUTER NETWORKS</span></a>
+      <div class="top-actions"><span class="simulation">OFFLINE SIMULATION</span><button id="theme-toggle"
+          aria-label="Toggle dark/light theme" title="Toggle dark/light theme">Dark</button><button id="inspect"
+          disabled>Inspect layer <span aria-hidden="true">↗</span></button><button id="fullscreen"
+          aria-label="Toggle fullscreen" title="Fullscreen (F)">⛶</button></div>
+    </header>
+
+    <main id="intro" class="intro" tabindex="-1">
+      <div class="intro-copy">
+        <p class="eyebrow">ONE REQUEST. TWO ROUTES.</p>
+        <h1>What happens<br>when you connect?</h1>
+        <p class="intro-description">Follow a packet through all seven OSI layers.<br>A VPN above. A direct connection
+          below. One step at a time.</p>
+        <form id="request-form">
+          <label for="message" class="eyebrow">YOUR REQUEST</label>
+          <textarea id="message" name="message" autocomplete="off" aria-label="Your message"
+            aria-describedby="input-error" rows="2" maxlength="16000" spellcheck="false">Hello, network.</textarea>
+          <div class="input-options"><select id="protocol" name="protocol" aria-label="Request protocol">
+              <option value="HTTPS">HTTPS · encrypted content</option>
+              <option value="HTTP">HTTP · visible content</option>
+            </select><label class="file-label">Attach file <input id="file" name="file" type="file"
+                aria-label="Upload a file" accept=".txt,.json,.csv,.png,.jpg,.jpeg,.pdf"></label><button
+              id="remove-file" type="button" hidden>Remove file</button></div>
+          <div class="start-row"><button type="submit" id="start" class="primary">Start <span
+                aria-hidden="true">→</span></button><span id="file-status">or use → to step through</span></div>
+          <p id="input-error" class="error" role="alert"></p>
+        </form>
+      </div>
+      <div class="intro-figure" aria-label="The same user request takes a VPN route above and a direct route below">
+        <div class="origin-label">YOUR DEVICE</div>
+        <div class="origin-mark"><span></span><span></span><span></span></div>
+        <div class="intro-route vpn"><span class="route-label">WITH VPN</span>
+          <div class="intro-line"><span class="intro-packet">request</span><span class="gateway-mark">VPN</span><span
+              class="endpoint">↗</span></div>
+          <p>Through an encrypted tunnel.</p>
+        </div>
+        <div class="intro-route direct"><span class="route-label">DIRECT</span>
+          <div class="intro-line"><span class="intro-packet">request</span><span class="endpoint">↗</span></div>
+          <p>Straight to the destination.</p>
+        </div>
+        <p class="figure-note">Same destination. Different visibility.</p>
+      </div>
+      <div class="intro-bottom"><span>A layer-by-layer visual study</span><span>7 layers <span class="divider">/</span>
+          2 paths <span class="divider">/</span> You set the pace</span></div>
+    </main>
+
+    <main id="presentation" tabindex="-1" hidden>
+      <section class="chapter-heading">
+        <div>
+          <p id="chapter-kicker" class="eyebrow"></p>
+          <h1 id="chapter-title"></h1>
+        </div>
+        <div class="heading-description">
+          <h2 id="step-title"></h2>
+          <p id="step-caption"></p>
+        </div>
+      </section>
+      <div id="viewport" class="viewport">
+        <div id="track" class="track"></div>
+      </div>
+      <footer class="controls">
+        <div class="control-left"><button id="restart" title="Return to request">Restart</button><span id="step-count"
+            class="mono"></span></div>
+        <div id="microsteps" class="microsteps" aria-label="Steps in this layer"></div>
+        <div class="navigation"><button id="previous" aria-label="Previous">← <span>Previous</span></button><button
+            id="next" class="primary" aria-label="Next"><span>Next</span> →</button></div>
+      </footer>
+    </main>
+    <nav id="layer-nav" class="layer-nav" aria-label="Layer navigation" hidden></nav>
+    <div class="bottom-note"><span>Educational model · no real traffic leaves this page</span><span id="keyboard-note">←
+        → navigate <span class="divider">/</span> F fullscreen</span></div>
+  </div>
+
+  <dialog id="inspector" aria-labelledby="inspect-title">
+    <header class="inspect-header">
+      <div>
+        <p class="eyebrow">UNDER THE HOOD</p>
+        <h2 id="inspect-title"></h2>
+      </div><button id="close-inspector" aria-label="Close inspector">Close ×</button>
+    </header>
+    <p id="inspect-note" class="inspect-note"></p>
+    <h3>Live data</h3>
+    <pre id="inspect-data"></pre>
+    <h3>Try it</h3>
+    <div id="experiments" class="experiments"></div>
+    <div id="lab-visual"></div>
+    <pre id="lab-result" role="status" aria-live="polite"></pre>
+    <details>
+      <summary>Assignment checklist · this layer</summary>
+      <ol id="assignment-checklist" class="assignment-checklist"></ol>
+    </details>
+    <details>
+      <summary>Model boundaries & references</summary>
+      <p>All OSI layers are illustrated; real Internet protocols span layers. Application, presentation and session
+        headers are teaching metadata. AES-256-GCM and SHA-256 run locally with Web Crypto. The VPN uses a simplified
+        UDP-encapsulated L3 tunnel, not an interoperable IPsec or WireGuard implementation. TCP checksums omit the IP
+        pseudo-header. Frames omit preamble, minimum-size padding and inter-frame gaps. NRZ/Manchester/NRZI, bit
+        stuffing, VLAN and shared-Ethernet collision experiments illustrate different media, not one Ethernet
+        specification. The initial secure key negotiation is a conceptual animation, not an implemented key-exchange
+        protocol.</p>
+      <p>References: <a href="https://www.rfc-editor.org/rfc/rfc4301" target="_blank" rel="noreferrer">RFC 4301 · IPsec
+          architecture</a>, <a href="https://www.rfc-editor.org/rfc/rfc9293" target="_blank" rel="noreferrer">RFC 9293 ·
+          TCP</a>, <a href="https://www.rfc-editor.org/rfc/rfc8446" target="_blank" rel="noreferrer">RFC 8446 · TLS</a>.
+        Task mapping: docs/coverage.md.</p>
+    </details>
+  </dialog>
+  <noscript>This visualizer needs JavaScript. Enable it, then reopen this page. It runs entirely on your
+    device.</noscript>
+  <script>
+    /* Educational wire model. No sockets, real TLS, or real IPsec are used. */
+    (function (root) {
+      'use strict';
+      const utf8 = text => new TextEncoder().encode(text);
+      const text = bytes => new TextDecoder().decode(bytes);
+      const concat = (...arrays) => {
+        const out = new Uint8Array(arrays.reduce((n, a) => n + a.length, 0));
+        let offset = 0; for (const a of arrays) { out.set(a, offset); offset += a.length; } return out;
+      };
+      const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+      const bits = bytes => Array.from(bytes, b => b.toString(2).padStart(8, '0')).join('');
+      function fromBits(value) {
+        if (!/^[01]*$/.test(value) || value.length % 8) throw Error('Expected complete binary bytes.');
+        return Uint8Array.from(value.match(/.{8}/g) || [], x => parseInt(x, 2));
+      }
+      const base64 = bytes => typeof Buffer !== 'undefined' ? Buffer.from(bytes).toString('base64') : btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+      const unbase64 = value => typeof Buffer !== 'undefined' ? new Uint8Array(Buffer.from(value, 'base64')) : Uint8Array.from(atob(value), x => x.charCodeAt(0));
+      function rle(bytes) {
+        const out = [];
+        for (let i = 0; i < bytes.length;) {
+          let count = 1; while (count < 255 && bytes[i + count] === bytes[i]) count++;
+          out.push(count, bytes[i]); i += count;
+        }
+        return Uint8Array.from(out);
+      }
+      function unrle(bytes) {
+        if (bytes.length % 2) throw Error('Truncated RLE stream.');
+        const out = [];
+        for (let i = 0; i < bytes.length; i += 2) {
+          if (!bytes[i]) throw Error('Invalid RLE count.');
+          for (let j = 0; j < bytes[i]; j++) out.push(bytes[i + 1]);
+        }
+        return Uint8Array.from(out);
+      }
+      async function sha256(bytes) { return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))); }
+      async function seal(bytes, key) {
+        key ||= await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
+        return { data, iv, key };
+      }
+      async function open({ data, iv, key }) { return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data)); }
+      function application(body, options = {}) {
+        if (typeof body !== 'string' || !body.trim()) throw Error('Enter a message first.');
+        if (utf8(body).length > 65536) throw Error('Keep the message under 64 KiB.');
+        const protocol = options.protocol || 'HTTPS';
+        if (!['HTTPS', 'HTTP'].includes(protocol)) throw Error('Choose HTTP or HTTPS.');
+        return { header: { protocol, method: options.file ? 'POST' : 'MESSAGE', sender: '192.168.1.10', receiver: '203.0.113.80', timestamp: new Date().toISOString(), type: options.file?.type || 'text/plain', filename: options.file?.name || null, encoding: options.file ? 'base64' : 'UTF-8' }, body };
+      }
+      class MessageQueue {
+        constructor() { this.items = []; }
+        enqueue(message) { if (!message?.header || typeof message.body !== 'string') throw Error('Invalid structured message.'); this.items.push(message); }
+        dequeue() { return this.items.shift(); }
+      }
+      class Session {
+        constructor(authenticated, now = Date.now()) {
+          if (!authenticated) throw Error('Authentication rejected.');
+          this.id = crypto.randomUUID(); this.token = crypto.randomUUID(); this.lastActive = now; this.state = 'active'; this.checkpoints = [0];
+        }
+        checkpoint(offset) { if (this.state !== 'active') throw Error('Session is not active.'); this.checkpoints.push(offset); }
+        recover() { this.state = 'active'; return this.checkpoints.at(-1); }
+        sync(token) { return token === this.token && this.state === 'active'; }
+        expire(elapsed, timeout = 1000) { if (elapsed >= timeout) { this.state = 'timed out'; return true; } return false; }
+        close() { this.state = 'closed'; }
+      }
+      function checksum(bytes) {
+        let sum = 0; for (let i = 0; i < bytes.length; i += 2) sum += (bytes[i] << 8) + (bytes[i + 1] || 0);
+        while (sum >>> 16) sum = (sum & 65535) + (sum >>> 16);
+        return (~sum) & 65535;
+      }
+      function tcpHeader(s, withChecksum = true) {
+        const b = new Uint8Array(20), v = new DataView(b.buffer);
+        v.setUint16(0, s.sport); v.setUint16(2, s.dport); v.setUint32(4, s.seq); v.setUint32(8, s.ack);
+        b[12] = 0x50; b[13] = 0x18; v.setUint16(14, 4096); v.setUint16(16, withChecksum ? s.checksum : 0); return b;
+      }
+      function segment(bytes, size = 96, dport = 443) {
+        if (!Number.isInteger(size) || size < 1) throw Error('Invalid segment size.');
+        const out = [];
+        for (let i = 0; i < bytes.length; i += size) {
+          const s = { seq: i, ack: 1, sport: 51514, dport, timestamp: Date.now(), data: bytes.slice(i, i + size) };
+          s.checksum = checksum(concat(tcpHeader(s, false), s.data)); out.push(s);
+        }
+        return out;
+      }
+      const validSegment = s => checksum(concat(tcpHeader(s), s.data)) === 0;
+      function reassemble(segments) {
+        const sorted = [...segments].sort((a, b) => a.seq - b.seq); let expected = 0;
+        for (const s of sorted) { if (s.seq !== expected || !validSegment(s)) throw Error('Missing, overlapping or corrupt segment.'); expected += s.data.length; }
+        return concat(...sorted.map(s => s.data));
+      }
+      function transfer(segments, { lost = -1, corrupt = -1, window = 3 } = {}) {
+        if (!Number.isInteger(window) || window < 1) throw Error('Window must be positive.');
+        const events = [], received = []; let retries = 0;
+        for (let start = 0; start < segments.length; start += window) {
+          events.push({ type: 'window', from: start, to: Math.min(start + window, segments.length) - 1 });
+          for (let i = start; i < Math.min(start + window, segments.length); i++) {
+            const s = segments[i]; events.push({ type: 'send', index: i, seq: s.seq });
+            if (i === lost || i === corrupt) { events.push({ type: i === lost ? 'timeout' : 'checksum rejected', index: i }); events.push({ type: 'retransmit', index: i }); retries++; }
+            if (!validSegment(s)) throw Error('Source segment corrupt.');
+            received.push(s); events.push({ type: 'ACK', ack: s.seq + s.data.length });
+          }
+        }
+        return { events, received, retries };
+      }
+      const graph = {
+        Client: { Router: 1 }, Router: { ISP: 2 }, ISP: { Relay: 2, Gateway: 3, Destination: 7 },
+        Relay: { Destination: 2 }, Gateway: { Destination: 3 }, Destination: {}
+      };
+      function route(g, source, target, blocked = []) {
+        const distance = { [source]: 0 }, previous = {}, pending = new Set(Object.keys(g).filter(x => !blocked.includes(x)));
+        if (!pending.has(source) || !pending.has(target)) return null;
+        while (pending.size) {
+          const u = [...pending].sort((a, b) => (distance[a] ?? Infinity) - (distance[b] ?? Infinity))[0];
+          if (!Number.isFinite(distance[u])) break;
+          pending.delete(u);
+          for (const [v, cost] of Object.entries(g[u])) {
+            if (cost < 0) throw Error('Dijkstra requires non-negative costs.');
+            if (pending.has(v) && (distance[v] ?? Infinity) > distance[u] + cost) { distance[v] = distance[u] + cost; previous[v] = u; }
+          }
+        }
+        if (!Number.isFinite(distance[target])) return null;
+        const path = [target]; while (path[0] !== source) path.unshift(previous[path[0]]);
+        return { path, cost: distance[target] };
+      }
+      const ipNumber = ip => ip.split('.').reduce((n, part) => ((n << 8) | Number(part)) >>> 0, 0);
+      function lookup(ip, table) {
+        return [...table].sort((a, b) => b.bits - a.bits).find(r => {
+          const mask = r.bits ? (0xffffffff << (32 - r.bits)) >>> 0 : 0;
+          return (ipNumber(ip) & mask) === (ipNumber(r.prefix) & mask);
+        }) || null;
+      }
+      function fragment(bytes, mtu = 100) {
+        const size = Math.floor((mtu - 20) / 8) * 8; if (size < 8) throw Error('MTU must fit an IPv4 header and 8 payload bytes.');
+        const result = []; for (let i = 0; i < bytes.length; i += size) result.push({ offset: i, more: i + size < bytes.length, data: bytes.slice(i, i + size) }); return result;
+      }
+      function defragment(fragments) {
+        const sorted = [...fragments].sort((a, b) => a.offset - b.offset); let expected = 0;
+        for (const [i, f] of sorted.entries()) {
+          if (f.offset !== expected || f.more !== (i < sorted.length - 1)) throw Error('Incomplete fragments.'); expected += f.data.length;
+        }
+        return concat(...sorted.map(f => f.data));
+      }
+      function trace(path, ttl = 64) {
+        // The source is not a forwarding hop. Routers decrement TTL; the endpoint accepts the remaining value.
+        const routers = path.slice(1, -1), hops = [];
+        for (const node of routers) { ttl--; hops.push({ node, ttl }); if (ttl <= 0) return { hops, expired: true }; }
+        return { hops: [...hops, { node: path.at(-1), ttl }], expired: false };
+      }
+      const nat = packet => ({ ...packet, originalSrc: packet.src, src: '198.51.100.24', sport: 62001 });
+      function ipPacket(data, { src = '192.168.1.10', dst = '203.0.113.80', protocol = 6, ttl = 64 } = {}) {
+        const header = new Uint8Array(20), v = new DataView(header.buffer); header[0] = 0x45;
+        v.setUint16(2, data.length + 20); header[8] = ttl; header[9] = protocol;
+        header.set(src.split('.').map(Number), 12); header.set(dst.split('.').map(Number), 16);
+        v.setUint16(10, checksum(header)); return { src, dst, ttl, protocol, header, bytes: concat(header, data) };
+      }
+      function validIP(bytes) {
+        if (bytes.length < 20 || bytes[0] !== 0x45) return false;
+        const length = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(2);
+        return length === bytes.length && checksum(bytes.slice(0, 20)) === 0;
+      }
+      function hybridTopology() {
+        const nodes = [
+          { id: 'Client A', role: 'host' }, { id: 'Client B', role: 'host' },
+          { id: 'Source switch', role: 'switch' }, { id: 'Router A', role: 'router' },
+          { id: 'Backbone', role: 'backbone' }, { id: 'Router B', role: 'router' },
+          { id: 'Destination switch', role: 'switch' }, { id: 'Server', role: 'host' },
+          { id: 'Server B', role: 'host' },
+        ];
+        const edges = [['Client A', 'Source switch'], ['Client B', 'Source switch'],
+        ['Source switch', 'Router A'], ['Router A', 'Backbone'], ['Backbone', 'Router B'],
+        ['Router B', 'Destination switch'], ['Destination switch', 'Server'], ['Destination switch', 'Server B']];
+        return { nodes, edges, benefits: ['Local faults stay within their LAN.', 'Additional LANs can join the backbone independently.', 'The routed backbone can use redundant paths.'] };
+      }
+      function crc32(bytes) {
+        let crc = 0xffffffff;
+        for (const b of bytes) { crc ^= b; for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0); }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+      function frame(payload, vlan = null) {
+        const header = Uint8Array.from([2, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 10, ...(vlan === null ? [8, 0] : [0x81, 0, (vlan >> 8) & 15, vlan & 255, 8, 0])]);
+        const bytes = concat(header, payload), crc = crc32(bytes), trailer = new Uint8Array(4);
+        new DataView(trailer.buffer).setUint32(0, crc, true);
+        return { src: '02:00:00:00:00:0a', dst: '02:00:00:00:00:01', vlan, bytes: concat(bytes, trailer), crc, headerSize: header.length };
+      }
+      const validFrame = f => crc32(f.bytes.slice(0, -4)) === new DataView(f.bytes.buffer, f.bytes.byteOffset + f.bytes.length - 4, 4).getUint32(0, true);
+      const stuff = value => value.replace(/11111/g, '111110');
+      const unstuff = value => value.replace(/111110/g, '11111');
+      const switchPort = (mac, table) => table[mac] ?? 'flood';
+      function encodeSignal(value, encoding = 'NRZ') {
+        let level = -1; const out = [];
+        for (const b of value) {
+          if (encoding === 'Manchester') out.push(...(b === '1' ? [1, -1] : [-1, 1]));
+          else if (encoding === 'NRZI') { if (b === '1') level *= -1; out.push(level); }
+          else out.push(b === '1' ? 1 : -1);
+        }
+        return out;
+      }
+      const noise = (value, indices) => [...value].map((b, i) => indices.includes(i) ? b === '1' ? '0' : '1' : b).join('');
+      const ber = (a, b) => { if (a.length !== b.length) throw Error('Bitstreams must have equal lengths.'); return a.length ? [...a].filter((x, i) => x !== b[i]).length / a.length : 0; };
+      const attenuate = (amplitude, distance, dbPerMeter = 0.02) => amplitude * Math.pow(10, -distance * dbPerMeter / 20);
+      const tdm = channels => { const out = []; for (let i = 0; i < Math.max(0, ...channels.map(c => c.length)); i++) for (const c of channels) out.push(c[i] ?? '—'); return out; };
+      const collision = starts => ({ detected: new Set(starts).size !== starts.length, retrySlots: starts.map((_, i) => i + 1) });
+      async function build(message, options = {}) {
+        const app = application(message, options), raw = utf8(JSON.stringify(app)), hash = await sha256(raw);
+        const compressed = options.compression ? rle(raw) : raw;
+        const encrypted = app.header.protocol === 'HTTPS', sealed = encrypted ? await seal(compressed) : null;
+        const payload = sealed ? sealed.data : compressed;
+        const session = new Session(true); for (let n = 128; n < payload.length; n += 128) session.checkpoint(n);
+        const segments = segment(payload, 96, encrypted ? 443 : 80);
+        const directPackets = segments.map(s => ipPacket(concat(tcpHeader(s), s.data)));
+        const tunnelKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        const vpnPackets = [];
+        for (const packet of directPackets) {
+          const encryptedPacket = await seal(packet.bytes, tunnelKey);
+          const udp = new Uint8Array(8), v = new DataView(udp.buffer);
+          v.setUint16(0, 4500); v.setUint16(2, 4500); v.setUint16(4, 8 + 12 + encryptedPacket.data.length);
+          const outer = ipPacket(concat(udp, encryptedPacket.iv, encryptedPacket.data), { dst: '203.0.113.7', protocol: 17 });
+          vpnPackets.push({ inner: packet, encrypted: encryptedPacket, outer, frame: frame(outer.bytes) });
+        }
+        const directFrames = directPackets.map(p => frame(p.bytes));
+        // Receiver validates every frame, tunnel tag and transport checksum, then reassembles actual bytes.
+        const recoveredSegments = [];
+        for (const [i, vp] of vpnPackets.entries()) {
+          if (!validFrame(vp.frame) || !validFrame(directFrames[i])) throw Error('Frame rejected.');
+          const unwrapped = await open({
+            ...vp.encrypted,
+            iv: vp.frame.bytes.slice(vp.frame.headerSize + 28, vp.frame.headerSize + 40),
+            data: vp.frame.bytes.slice(vp.frame.headerSize + 40, -4)
+          });
+          if (!validIP(unwrapped) || !validIP(vp.outer.bytes)) throw Error('Invalid IPv4 header.');
+          recoveredSegments.push({ ...segments[i], data: unwrapped.slice(40) });
+        }
+        const vpnStream = reassemble(recoveredSegments);
+        const directStream = reassemble(segments.map((s, i) => ({ ...s, data: directFrames[i].bytes.slice(14 + 40, -4) })));
+        if (hex(vpnStream) !== hex(directStream)) throw Error('Routes disagree.');
+        const decrypted = sealed ? await open({ ...sealed, data: vpnStream }) : vpnStream;
+        const recovered = options.compression ? unrle(decrypted) : decrypted;
+        const received = JSON.parse(text(recovered));
+        return {
+          app, raw, hash, received, integrity: await sha256(recovered) === hash,
+          presentation: { compressed, payload, encrypted, sealed, compression: options.compression ? 'RLE' : 'none', base64: base64(payload) },
+          session, segments, direct: { packets: directPackets, frames: directFrames, frame: directFrames[0], ip: directPackets[0] },
+          vpn: { packets: vpnPackets, frame: vpnPackets[0].frame, outer: vpnPackets[0].outer },
+          route: route(graph, 'Client', 'Destination'), trace: trace(route(graph, 'Client', 'Destination').path),
+          handshake: ['SYN · seq 0', 'SYN-ACK · seq 0 · ack 1', 'ACK · seq 1 · ack 1']
+        };
+      }
+      const api = { utf8, text, concat, hex, bits, fromBits, base64, unbase64, rle, unrle, sha256, seal, open, application, MessageQueue, Session, checksum, tcpHeader, segment, validSegment, reassemble, transfer, graph, route, lookup, fragment, defragment, trace, nat, ipPacket, validIP, hybridTopology, crc32, frame, validFrame, stuff, unstuff, switchPort, encodeSignal, noise, ber, attenuate, tdm, collision, build };
+      if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Net = api;
+    })(globalThis);
+
+  </script>
+  <script>
+    /* Each click is a teaching action, not a timer. OSI numbers descend at the sender. */
+    globalThis.Story = [
+      {
+        id: 'connect', title: 'Connect', number: '00', unit: 'Tunnel setup', steps: [
+          ['Contact the VPN gateway', 'The VPN client reaches a known gateway using the ordinary network.', 'Your device → router → ISP → VPN gateway. No tunnel exists yet.', 'The direct route needs no VPN gateway or tunnel setup.', 'setup'],
+          ['Authenticate both ends', 'A secure setup verifies identities before accepting a tunnel.', 'The client verifies the gateway; the gateway accepts an authorized client.', 'Normal networking does not authenticate a VPN gateway.', 'auth'],
+          ['Agree on tunnel keys', 'The peers derive shared traffic keys; a password is not the traffic key.', 'A fresh AES-GCM key is generated for this educational tunnel.', 'HTTPS still negotiates its own independent application keys.', 'keys'],
+          ['Install the tunnel route', 'The VPN client routes destination traffic into a virtual network interface.', 'The tunnel is ready. Inner destination traffic now goes to the gateway.', 'The original default route still leads straight to the destination.', 'route-ready'],
+        ]
+      },
+      {
+        id: 'application', title: 'Application', number: '07', unit: 'Message', steps: [
+          ['Create the request', 'Both paths begin with exactly the same user data.', 'The application hands your request to the networking stack.', 'The same request starts here; a VPN does not change what you wrote.', 'message'],
+          ['Add application metadata', 'Protocol, sender, receiver, timestamp and content type describe the message.', 'The teaching header identifies the intended destination, not the VPN gateway.', 'The application header is identical on the direct path.', 'metadata'],
+          ['Structure and queue', 'The request becomes UTF-8 JSON and enters a first-in, first-out buffer.', 'One structured message is queued, then validated for transfer.', 'The same JSON is passed to the next layer.', 'json'],
+        ]
+      },
+      {
+        id: 'presentation', title: 'Presentation', number: '06', unit: 'Bytes', steps: [
+          ['Translate into bytes', 'Characters become UTF-8 bytes; Base64 is an encoding, not encryption.', 'The exact same byte stream enters both paths.', 'There is no privacy benefit from encoding alone.', 'bytes'],
+          ['Compress before encryption', 'Optional RLE is a teaching transform; small messages may grow instead of shrink.', 'The compression control determines whether RLE runs.', 'Compression is independent of whether a VPN is used.', 'compress'],
+          ['Protect application content', 'HTTPS protects content on both routes. HTTP does not.', 'Application encryption and tunnel encryption are separate protections.', 'HTTPS remains encrypted even without a VPN.', 'encrypt'],
+          ['Fingerprint the payload', 'SHA-256 lets the receiver verify that the reconstructed message is identical.', 'A digest is computed from the original structured bytes.', 'The final digest must match on both routes.', 'hash'],
+        ]
+      },
+      {
+        id: 'session', title: 'Session', number: '05', unit: 'Stream', steps: [
+          ['Open an application session', 'A session ID tracks this logical exchange, not the VPN tunnel itself.', 'An authenticated teaching session is created for the request.', 'Direct traffic uses the same application-session model.', 'session'],
+          ['Synchronize and checkpoint', 'A token synchronizes the session; byte checkpoints allow a simulated resume.', 'A checkpoint records the last completed part of the stream.', 'Recovery is an application feature, not a VPN-only feature.', 'checkpoint'],
+          ['Pass the controlled stream', 'An active session sends its stream to transport; idle sessions can time out.', 'Session metadata stays at the endpoint in this simulation.', 'OSI session behavior is modeled; it is not an extra TCP/IP wire header.', 'stream'],
+        ]
+      },
+      {
+        id: 'transport', title: 'Transport', number: '04', unit: 'Segment', steps: [
+          ['Open the TCP connection', 'SYN → SYN-ACK → ACK establishes the application transport connection.', 'The inner TCP connection is between the client and destination.', 'The same three-way handshake runs directly.', 'handshake'],
+          ['Segment the stream', 'The payload is split into 96-byte chunks with source and destination ports.', 'Inner TCP segments retain the application destination port.', 'HTTPS uses port 443; HTTP uses port 80.', 'segments'],
+          ['Number and check each segment', 'Sequence numbers track byte offsets; a checksum detects corruption.', 'The VPN has not wrapped these segments yet.', 'A corrupt segment must not enter the reassembled stream.', 'checksum'],
+          ['Send, acknowledge, recover', 'A sliding window permits several segments in flight; loss triggers retransmission.', 'TCP reliability belongs to the inner connection.', 'Direct TCP also uses acknowledgments and retransmissions.', 'window'],
+        ]
+      },
+      {
+        id: 'network', title: 'Network', number: '03', unit: 'Packet', steps: [
+          ['Address the inner packet', 'An IP header identifies the client and the actual destination.', 'Inner IP: 192.168.1.10 → 203.0.113.80.', 'The direct packet has the same original destination.', 'inner'],
+          ['Encrypt and encapsulate', 'The VPN encrypts the complete inner IP packet, then adds an outer header.', 'Outer IP → UDP → encrypted inner IP + TCP + application data.', 'No extra tunnel header: IP → TCP → application data.', 'tunnel'],
+          ['Choose the next hop', 'Routers forward by the visible IP destination, using a routing table.', 'The local network can see the VPN gateway, not the inner destination.', 'The local network can see the destination IP, even with HTTPS.', 'routing'],
+          ['Forward across the network', 'Routing costs select a path; TTL limits forwarding; NAT rewrites the public source.', 'The router sends the outer packet toward 203.0.113.7.', 'The router sends the direct packet toward 203.0.113.80.', 'hops'],
+          ['Respect the link MTU', 'Oversized IPv4 payloads can fragment; the receiver reassembles by byte offset.', 'The tunnel adds overhead, leaving less room for inner data.', 'The MTU experiment shows fragment boundaries and reassembly.', 'fragment'],
+        ]
+      },
+      {
+        id: 'link', title: 'Data link', number: '02', unit: 'Frame', steps: [
+          ['Address the next local hop', 'MAC addresses identify neighbors on this link, not remote websites.', 'The destination MAC is the local router, not the VPN server.', 'The next-hop MAC is the same local router.', 'mac'],
+          ['Wrap the IP packet', 'An Ethernet header and CRC-32 trailer form a frame.', 'The frame carries the outer, tunnel-encrypted IP packet.', 'The frame carries the original destination IP packet.', 'frame'],
+          ['Check and forward the frame', 'The receiver checks CRC; a switch uses its MAC table to select a port.', 'Every hop uses a new link frame; the VPN tunnel persists across hops.', 'A failed CRC causes the frame to be discarded on either route.', 'crc'],
+        ]
+      },
+      {
+        id: 'physical', title: 'Physical', number: '01', unit: 'Bits / signal', steps: [
+          ['Serialize the frame', 'Each frame byte becomes eight bits ready for a physical medium.', 'The tunnel is now just bits on the wire, like any other traffic.', 'Direct traffic also becomes a binary bitstream.', 'bits'],
+          ['Encode a physical signal', 'NRZ maps bits to voltage levels; Manchester adds a mid-bit transition.', 'The waveform samples 24 transport bits carried inside the frame.', 'Physical encoding does not itself encrypt the traffic.', 'wave'],
+          ['Transmit through the medium', 'Noise may flip bits; attenuation reduces amplitude with distance.', 'CRC and TCP detect or recover damage; encryption tags detect tampering.', 'The same physical impairments affect the direct route.', 'noise'],
+          ['Share the medium', 'Time-division multiplexing interleaves channel time slots.', 'VPN and direct are separate comparison runs, not duplicate real transmissions.', 'A hybrid topology combines local stars with a routed backbone.', 'tdm'],
+        ]
+      },
+      {
+        id: 'gateway', title: 'VPN gateway', number: '↗', unit: 'Tunnel exit', steps: [
+          ['Remove the tunnel wrapper', 'The VPN gateway validates and decrypts the tunnel payload.', 'Outer IP + UDP + VPN protection are removed; the inner packet is recovered.', 'The direct packet never visits a VPN gateway.', 'unwrap'],
+          ['Forward to the destination', 'The VPN gateway sends the recovered traffic onward using its egress address.', 'The destination sees the VPN exit IP instead of your home public IP.', 'The destination sees your router’s public NAT address.', 'exit'],
+          ['Know where protection ends', 'The tunnel ends at the gateway. HTTPS continues to the destination.', 'Without HTTPS, the gateway and onward network can read application content.', 'Without HTTPS, the direct path can expose application content throughout.', 'boundary'],
+        ]
+      },
+      {
+        id: 'receiver', title: 'Receiver', number: '✓', unit: 'Decapsulation', steps: [
+          ['Climb back up the stack', 'Bits → frames → IP → TCP → session → presentation → application.', 'Every frame and segment is checked before reassembly.', 'The same receiver stack reconstructs direct traffic.', 'receive'],
+          ['Reassemble and reverse transforms', 'Order segments, decrypt application data, decompress, then decode JSON.', 'The actual tunnel ciphertext is decrypted and reassembled.', 'Direct-path bytes reconstruct the same original message.', 'reassemble'],
+          ['Verify delivery and close', 'The received SHA-256 must match. The application session can now close.', 'Same message delivered. Extra protection on the client-to-gateway path.', 'Same message delivered. No VPN tunnel or hidden inner destination.', 'delivered'],
+        ]
+      },
+    ];
+
+  </script>
+  <script>
+    /* The assignment checklist is available inside the page, not only in the README. */
+    globalThis.Coverage = {
+      connect: [
+        'Contact gateway → verify identities → derive keys → install tunnel route.',
+        'Setup is conceptual. Real encryption uses fresh local AES-GCM keys; no live VPN is created.',
+      ],
+      application: [
+        '1 · Message entry / file upload — request screen; uploaded bytes become Base64.',
+        '2 · Application header — protocol, sender and receiver in Live data.',
+        '3 · Message formatting — JSON serialization; UTF-8 bytes shown.',
+        '4 · Metadata — timestamp, content type and filename in the header.',
+        '5 · Transfer initiation — MESSAGE or POST over selected HTTP / HTTPS model.',
+        '6 · Chat / sharing simulation — request input, FIFO messages and receiver download.',
+        '7 · Application errors — blank messages, unsupported types, empty and oversized files rejected.',
+        '8 · Presentation handoff — Forward to presentation computes the structured byte stream.',
+        '9 · Message buffer — Queue a second message / Send queued message perform FIFO operations.',
+        '10 · Validate and pass — validation runs before the complete pipeline starts.',
+      ],
+      presentation: [
+        '1 · Encoding — Encode / decode Base64; UTF-8 byte preview.',
+        '2 · Compression — Toggle RLE compression rebuilds the active pipeline.',
+        '3 · AES encryption — Web Crypto AES-256-GCM, real bytes and a fresh nonce.',
+        '4 · AES decryption — Encrypt / decrypt AES verifies the round trip.',
+        '5 · Presentation header — encoding, encryption and compression teaching metadata in Live data.',
+        '6 · Binary-to-text — Binary ↔ text converts actual UTF-8 bytes both ways.',
+        '7 · File-to-bytes — uploaded ArrayBuffer → byte stream → Base64 → receiver bytes.',
+        '8 · Integrity hash — real SHA-256 over the original JSON.',
+        '9 · Combined utility — build() compresses, optionally encrypts and exposes Base64.',
+        '10 · Session handoff — the transformed payload feeds the active session.',
+      ],
+      session: [
+        '1 · Session ID — unique UUID for each transfer.',
+        '2 · Initiation / teardown — Teardown / initiate and receiver Close session.',
+        '3 · Checkpoints — saved every 128 payload bytes.',
+        '4 · Recovery — Interrupt / recover resumes at the last stored offset (simulation).',
+        '5 · Timeout — Simulate idle timeout closes an inactive session.',
+        '6 · Concurrency — Start concurrent sessions creates three independent sessions.',
+        '7 · Synchronization — Check synchronization token accepts only the current token.',
+        '8 · Authentication — Verify authentication in Connect rejects unauthorized sessions.',
+        '9 · Session header — ID, state and checkpoints shown as endpoint teaching metadata.',
+        '10 · Transport handoff — session-controlled payload is segmented next.',
+      ],
+      transport: [
+        '1 · Segmentation — actual payload split into 96-byte chunks.',
+        '2 · TCP handshake — three-way SYN, SYN-ACK, ACK simulation.',
+        '3 · Ports — source 51514, HTTPS destination 443 or HTTP destination 80.',
+        '4 · Checksum — computed ones-complement checksum for every modeled segment.',
+        '5 · Corruption detection — Corrupt TCP checksum mutates a real segment and rejects it.',
+        '6 · Flow control — Sliding window / ACKs shows a window of three segments.',
+        '7 · Retransmission — Drop a segment simulates timeout and resends the original.',
+        '8 · Sequence, ACK, timestamp — byte offsets, acknowledgments and teaching timestamp in Live data.',
+        '9 · Reliable transfer — ACK / retransmission event sequence and verified reassembly.',
+        '10 · IP handoff — binary TCP header + data feed the network layer.',
+      ],
+      network: [
+        '1 · IP addresses — source, destination and outer gateway addresses in Live data.',
+        '2 · Routing table — Routing table lookup uses explicit CIDR routes.',
+        '3 · Dijkstra — optimal weighted path computed from the topology.',
+        '4 · TTL — Expire TTL drops the packet at the first forwarding router.',
+        '5 · Fragmentation — experimental MTU 100; offsets and more-fragments flags computed.',
+        '6 · Reassembly — Fragment / reassemble reverses out-of-order fragments.',
+        '7 · Traceroute — hop-by-hop TTL values displayed.',
+        '8 · NAT — private source address / port mapped to public address / port.',
+        '9 · Unreachable — blocked destination returns no route; nothing is forwarded.',
+        '10 · Network header — binary IPv4 header, header checksum, payload and link handoff.',
+        '11 · Dynamic optimal route — Fail a relay / reroute recalculates the least-cost path.',
+      ],
+      link: [
+        '1 · MAC assignment — source device and next-hop router MACs.',
+        '2 · Frame structure — MAC header, EtherType, payload and little-endian CRC-32 trailer.',
+        '3 · Encapsulation — every modeled IP packet becomes a frame.',
+        '4 · CRC generation — real CRC-32 over header and payload.',
+        '5 · CRC validation — Flip a frame bit / CRC rejects a damaged frame.',
+        '6 · Bit stuffing — Bit stuff / unstuff shows an HDLC-style boundary example.',
+        '7 · CSMA/CD — Shared-medium collision simulates simultaneous send and separate retry slots.',
+        '8 · Switch forwarding — MAC table selects the port; unknown MAC floods.',
+        '9 · VLAN — Tag VLAN 42 inserts an 802.1Q-style tag and recomputes CRC.',
+        '10 · Physical handoff — the whole modeled frame is serialized into bits.',
+      ],
+      physical: [
+        '1 · Bitstream — all frame bytes converted to eight-bit binary values.',
+        '2 · NRZ — actual voltage samples and waveform.',
+        '3 · Manchester — two half-bit samples with a transition in every bit.',
+        '4 · NRZI — a 1 changes the previous voltage level.',
+        '5 · Noise — randomly selected frame bit is flipped.',
+        '6 · BER — altered bits divided by the entire frame bit count.',
+        '7 · Hybrid topology — generated local stars connected by a routed backbone; benefits explained.',
+        '8 · Attenuation — amplitude calculated from distance and dB per meter.',
+        '9 · TDM — actual interleaved channel time slots.',
+        '10 · Final signal — bit labels, voltage path and alternative encoding controls.',
+      ],
+      gateway: [
+        'Decrypt inner packet validates the tunnel authentication tag and recovers original IP bytes.',
+        'Observer comparison distinguishes local ISP, VPN provider, destination and HTTPS protection.',
+        'Tunnel exit / NAT is a routing visualization, not a second live network connection.',
+      ],
+      receiver: [
+        '1 · Master pipeline — one Start action runs the integrated engine end-to-end.',
+        '2 · Header verification — frame CRC, IP header and TCP data visible across the layers.',
+        '3 · Step-by-step transformation — 36 manual steps, all seven OSI layers.',
+        '4 · Physical faults — random frame-bit injection with computed BER and CRC rejection.',
+        '5 · Transport faults — checksum injection and retransmission in Transport.',
+        '6 · Session interruption — checkpoint recovery in Session.',
+        '7 · Receiver module — ordered segment / fragment reassembly and reverse transforms.',
+        '8 · Integration cases — Run verification and Verify failed transmission.',
+        '9 · Encapsulation table — dynamically generated byte counts from the current request.',
+        '10 · Single send-message demo — same request reaches both routes; received file can be downloaded.',
+        '11 · Source / Git — tests and original assignment included. Local master branch; push requires GitHub authentication.',
+      ],
+    };
+
+  </script>
+  <script>
+    /* Rendering only: the live data comes from engine.js, not prewritten packet values. */
+    (() => {
+      'use strict';
+      const E = Net, chapters = Story, $ = id => document.getElementById(id);
+      const state = { chapter: 0, step: 0, pipeline: null, file: null, compression: false, encoding: 'NRZ', busy: false, running: false };
+      const queue = new E.MessageQueue();
+      const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+      const short = (value, length = 40) => String(value).length > length ? String(value).slice(0, length) + '…' : String(value);
+      const t = (x, y, value, options = '') => `<text x="${x}" y="${y}" font-size="13" ${options}>${esc(value)}</text>`;
+      const line = (x1, y1, x2, y2, cls = 'stroke', extra = '') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" ${extra}/>`;
+      const rect = (x, y, w, h, cls = 'box', extra = '') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" class="${cls}" ${extra}/>`;
+      const label = (x, y, value) => t(x, y, value, 'class="dim" font-size="10"');
+      const arrow = (x, y) => `<path d="M${x - 5} ${y - 4}l5 4-5 4" class="stroke"/>`;
+      const node = (x, value, top = '') => line(x, 62, x + 1, 62) + `<circle cx="${x}" cy="62" r="4" fill="currentColor"/>` + t(x, 96, value, 'text-anchor="middle" font-size="12"') + (top ? label(x - 30, 30, top) : '');
+      function box(x, y, w, title, subtitle = '', cls = '') {
+        return `<g class="${cls}">${rect(x, y, w, 48)}${t(x + 12, y + 22, title)}${subtitle ? label(x + 12, y + 38, subtitle) : ''}</g>`;
+      }
+      function svg(body, name = 'Packet transformation diagram') { return `<svg class="diagram" viewBox="0 0 900 140" role="img" aria-label="${esc(name)}">${body}</svg>`; }
+      function packetStrip(headers, payload, opts = {}) {
+        const x = 50, y = 43, widths = headers.map(h => h.length > 10 ? 145 : 95), total = widths.reduce((a, b) => a + b, 0), pw = Math.max(150, 775 - total);
+        let at = x, body = '';
+        headers.forEach((h, i) => { body += rect(at, y, widths[i], 51) + t(at + 12, y + 30, h); at += widths[i]; });
+        body += rect(at, y, pw, 51, 'box', opts.encrypted ? 'stroke-dasharray="4 3"' : '') + rect(at, y, pw, 51, 'soft') + t(at + 14, y + 30, short(payload, Math.floor(pw / 9)));
+        if (opts.note) body += label(x, 120, opts.note);
+        return svg(`<g class="packet">${body}</g>`);
+      }
+      function routeDiagram(names, active = 2, tunnel = false) {
+        const gap = 750 / Math.max(1, names.length - 1), xs = names.map((_, i) => 60 + gap * i);
+        let body = line(60, 62, 810, 62, 'faint');
+        if (tunnel) body += rect(xs[0] - 24, 39, xs[names.length - 2] - xs[0] + 48, 46, 'stroke', 'stroke-dasharray="5 5"') + label(xs[1] + 20, 23, 'ENCRYPTED TUNNEL');
+        names.forEach((name, i) => { body += node(xs[i], name); if (i < names.length - 1) body += arrow(xs[i] + gap / 2, 62); });
+        const a = Math.min(active, names.length - 1), px = Math.min(xs[a] - 45, 760);
+        body += `<g class="packet">${rect(px, 44, 80, 36)}${t(px + 12, 67, tunnel ? 'sealed' : 'packet', 'font-size="11"')}</g>`;
+        return svg(body);
+      }
+      function segmentsDiagram(p, window = false) {
+        const count = Math.min(6, p.segments.length), start = 50, gap = 126;
+        let body = line(35, 71, 855, 71, 'faint');
+        for (let i = 0; i < count; i++) {
+          const s = p.segments[i];
+          body += box(start + i * gap, 46, 110, `SEG ${i + 1}`, `${s.data.length} B · ${s.seq}`, 'packet');
+          body += label(start + i * gap, 118, window ? (i < 3 ? `ACK ${s.seq + s.data.length}` : 'waiting') : `seq ${s.seq}`);
+        }
+        if (window) body += rect(40, 33, Math.min(count, 3) * gap - 5, 73, 'stroke', 'stroke-dasharray="4 4"') + label(50, 21, 'WINDOW = 3 SEGMENTS');
+        return svg(body);
+      }
+      function waveDiagram(bitstream, encoding = state.encoding, amplitude = 1) {
+        const value = bitstream.slice(0, 24), samples = E.encodeSignal(value, encoding), width = 800 / samples.length;
+        let path = '', last = 0;
+        samples.forEach((level, i) => {
+          const y = 67 - level * 24 * amplitude, x = 50 + i * width;
+          path += i ? `L${x} ${last}L${x} ${y}` : `M${x} ${y}`;
+          path += `L${x + width} ${y}`; last = y;
+        });
+        let body = line(50, 67, 850, 67, 'faint') + `<path d="${path}" class="stroke" stroke-width="2"/>`;
+        [...value].forEach((b, i) => { body += label(50 + i * 800 / value.length + 8, 120, b); });
+        body += label(50, 17, `${encoding} · first ${value.length} payload bits · illustrative voltage`);
+        return svg(body, `${encoding} waveform of ${value}`);
+      }
+      function diagram(mode, vpn) {
+        const p = state.pipeline, data = p.presentation, fp = vpn ? p.vpn.frame : p.direct.frame;
+        if (matchMedia('(max-width:650px)').matches) return compactDiagram(mode, vpn);
+        const preview = short(p.app.body, 39), ciphertext = E.hex(data.payload.slice(0, 18));
+        switch (mode) {
+          case 'setup': return routeDiagram(vpn ? ['Device', 'Router', 'ISP', 'VPN gateway'] : ['Device', 'Router', 'ISP', 'Destination'], state.step);
+          case 'auth': return svg(box(65, 45, 180, 'Client identity', vpn ? 'authorized' : 'ordinary client') + line(245, 69, 625, 69, 'stroke', 'stroke-dasharray="5 5"') + t(355, 53, vpn ? 'verify ↔ accept' : 'no VPN authentication') + box(625, 45, 205, vpn ? 'VPN certificate' : 'Destination', vpn ? 'trusted gateway' : 'HTTPS: own certificate'));
+          case 'keys': return svg(box(65, 43, 190, vpn ? 'Client key' : 'Application', 'independent endpoint') + line(255, 67, 615, 67) + t(335, 57, vpn ? 'AES-256-GCM' : 'HTTPS / TLS') + box(615, 43, 215, vpn ? 'Gateway key' : 'Destination key', vpn ? 'same tunnel key' : 'not a VPN key') + label(65, 122, 'Conceptual setup · keys are generated locally, not exchanged across a real network'));
+          case 'route-ready': return routeDiagram(vpn ? ['Device', 'Virtual interface', 'VPN gateway', 'Destination'] : ['Device', 'Default route', 'ISP', 'Destination'], 1, vpn);
+          case 'message': return svg(label(55, 24, 'USER DATA') + box(55, 44, 350, preview, `${E.utf8(p.app.body).length} bytes before metadata`, 'packet') + line(405, 68, 720, 68) + arrow(720, 68) + t(744, 74, 'application'));
+          case 'metadata': return packetStrip(['App metadata'], preview, { note: `${p.app.header.protocol} · ${p.app.header.sender} → ${p.app.header.receiver} · ${p.app.header.type}` });
+          case 'json': return svg(box(50, 44, 175, 'JSON request', `${p.raw.length} UTF-8 bytes`, 'packet') + line(225, 68, 405, 68) + arrow(405, 68) + box(420, 44, 175, 'FIFO queue', '1 → validated → sent') + line(595, 68, 725, 68) + arrow(725, 68) + t(740, 74, 'layer 6'));
+          case 'bytes': return svg(label(50, 25, 'UTF-8') + t(50, 70, E.hex(p.raw.slice(0, 28)).match(/.{2}/g).join(' '), 'font-size="18"') + label(50, 112, `${p.raw.length} bytes · Base64 preview: ${E.base64(p.raw).slice(0, 45)}…`));
+          case 'compress': return svg(box(55, 44, 195, 'Original JSON', `${p.raw.length} B`) + line(250, 68, 600, 68) + t(330, 53, state.compression ? 'RLE enabled' : 'RLE bypassed') + arrow(600, 68) + box(620, 44, 210, 'Output bytes', `${data.compressed.length} B`, 'packet') + label(55, 124, state.compression ? 'RLE uses count/value byte pairs. Compression can expand varied text.' : 'Compression is off. Open Inspect layer to test RLE on these exact bytes.'));
+          case 'encrypt': return packetStrip(['Presentation'], data.encrypted ? ciphertext : preview, { encrypted: data.encrypted, note: data.encrypted ? 'Application AES-GCM ciphertext · the same protection on BOTH routes' : 'HTTP: application bytes are readable · VPN protection will be added at layer 3' });
+          case 'hash': return svg(label(50, 25, 'SHA-256 OF THE ORIGINAL JSON') + t(50, 70, p.hash.slice(0, 32), 'font-size="20"') + t(50, 101, p.hash.slice(32), 'font-size="20"') + label(540, 94, 'compare again at receiver'));
+          case 'session': return svg(box(50, 44, 210, 'Authenticated', 'token accepted') + line(260, 68, 460, 68) + arrow(460, 68) + box(480, 44, 350, 'Application session', `ID ${p.session.id.slice(0, 18)}…`, 'packet'));
+          case 'checkpoint': {
+            const cps = p.session.checkpoints.slice(0, 6); let body = line(60, 65, 820, 65);
+            cps.forEach((cp, i) => { const x = 70 + i * 130; body += line(x, 54, x, 78) + label(x, 107, `${cp} B`) + t(x, 36, i === cps.length - 1 ? 'resume here' : 'saved', 'font-size="11"'); });
+            return svg(body + label(620, 125, '128-byte checkpoints'));
+          }
+          case 'stream': return packetStrip(['Session info'], data.encrypted ? 'controlled ciphertext stream' : 'controlled byte stream', { note: `state: ${p.session.state} · ID ${p.session.id.slice(0, 8)} · metadata is not an extra Internet wire header` });
+          case 'handshake': return svg(line(80, 25, 80, 120, 'faint') + line(800, 25, 800, 120, 'faint') + line(80, 40, 800, 40) + arrow(800, 40) + t(355, 31, 'SYN · seq 0') + line(800, 75, 80, 75) + t(290, 67, '← SYN-ACK · seq 0 · ack 1') + line(80, 110, 800, 110) + arrow(800, 110) + t(330, 102, 'ACK · seq 1 · ack 1'));
+          case 'segments': return segmentsDiagram(p);
+          case 'checksum': return packetStrip(['TCP header'], `segment 1 · ${p.segments[0].data.length} B`, { note: `51514 → ${p.segments[0].dport} · seq 0 · ack 1 · checksum 0x${p.segments[0].checksum.toString(16).padStart(4, '0')} · ${E.validSegment(p.segments[0]) ? 'VALID' : 'INVALID'}` });
+          case 'window': return segmentsDiagram(p, true);
+          case 'inner': return packetStrip(['IP', 'TCP'], data.encrypted ? 'HTTPS ciphertext' : 'HTTP content', { note: 'source 192.168.1.10 → actual destination 203.0.113.80 · TTL 64', encrypted: data.encrypted });
+          case 'tunnel': return vpn ? packetStrip(['Outer IP', 'UDP 4500'], 'encrypted [ inner IP | TCP | data ]', { note: `visible destination: ${p.vpn.outer.dst} · inner packet hidden · +56 bytes per packet`, encrypted: true }) : packetStrip(['IP', 'TCP'], data.encrypted ? 'HTTPS ciphertext' : 'HTTP content', { note: 'visible destination: 203.0.113.80 · no tunnel encapsulation', encrypted: data.encrypted });
+          case 'routing': return routeDiagram(vpn ? ['Client', 'Router', 'ISP', 'VPN gateway'] : ['Client', 'Router', 'ISP', 'Destination'], 1, vpn);
+          case 'hops': return routeDiagram(vpn ? ['Client', 'Router / NAT', 'ISP', 'VPN gateway'] : ['Client', 'Router / NAT', 'ISP', 'Relay', 'Destination'], 2, vpn);
+          case 'fragment': {
+            const b = vpn ? p.vpn.outer.bytes.slice(20) : p.direct.ip.bytes.slice(20), fragments = E.fragment(b, 100);
+            let body = label(50, 22, 'EXPERIMENTAL MTU = 100 B · 20 B IP HEADER');
+            fragments.slice(0, 6).forEach((f, i) => { body += box(50 + i * 132, 45, 117, `${f.data.length} B`, `offset ${f.offset}`, 'packet'); });
+            return svg(body + label(50, 122, `${fragments.length} fragments · actual next-link MTU is assumed sufficient in the main pipeline`));
+          }
+          case 'mac': return svg(box(50, 44, 250, 'Your interface', fp.src) + line(300, 68, 545, 68) + arrow(545, 68) + box(565, 44, 265, 'Next-hop router', fp.dst) + label(50, 124, 'MAC addresses are local-hop identifiers. They change on the next link.'));
+          case 'frame': return packetStrip(['Dst MAC', 'Src MAC', 'Type'], vpn ? 'outer IP · tunnel payload · CRC' : 'IP · TCP · payload · CRC', { note: `${fp.bytes.length} B modeled frame · CRC-32 0x${fp.crc.toString(16).padStart(8, '0')}` });
+          case 'crc': return svg(box(50, 44, 245, `CRC 0x${fp.crc.toString(16)}`, 'receiver recomputes') + line(295, 68, 550, 68) + t(360, 53, 'MATCH ✓') + arrow(550, 68) + box(570, 44, 260, 'Switch lookup', `${fp.dst} → port 1`) + label(50, 124, 'Flip a bit in the inspector to see CRC reject the damaged frame.'));
+          case 'bits': return svg(label(50, 24, `${fp.bytes.length} MODELED FRAME BYTES → ${fp.bytes.length * 8} BITS`) + t(50, 70, E.bits(fp.bytes).slice(0, 48).match(/.{8}/g).join(' '), 'font-size="18"') + label(50, 115, 'Preview: first 6 bytes. The entire frame is serialized in the live-data inspector.'));
+          case 'wave': return waveDiagram(E.bits(fp.bytes.slice(fp.headerSize + 20)));
+          case 'noise': return waveDiagram(E.bits(fp.bytes.slice(fp.headerSize + 20)), state.encoding, .65);
+          case 'tdm': return svg(label(50, 24, 'TIME-DIVISION MULTIPLEXING · TWO EXAMPLE CHANNELS') + E.tdm(['ABCD', '1234']).map((v, i) => rect(50 + i * 96, 48, 85, 43) + t(84 + i * 96, 75, v)).join('') + label(50, 122, 'A · 1 · B · 2 · C · 3 · D · 4 → time'));
+          case 'unwrap': return vpn ? svg(box(50, 43, 230, 'Outer IP + UDP', 'remove tunnel wrapper') + line(280, 67, 510, 67) + arrow(510, 67) + box(530, 43, 300, 'Recovered inner packet', 'AES-GCM tag verified', 'packet')) : routeDiagram(['Client', 'Router', 'ISP', 'Destination'], 3);
+          case 'exit': return routeDiagram(vpn ? ['Gateway / NAT', 'Onward network', 'Destination'] : ['Home NAT', 'ISP', 'Destination'], 1);
+          case 'boundary': return packetStrip(['IP', 'TCP'], data.encrypted ? 'HTTPS remains encrypted to destination' : 'HTTP is now readable on the onward path', { note: vpn ? 'source at destination: VPN exit 203.0.113.7 · tunnel has ended' : 'source at destination: home public IP 198.51.100.24', encrypted: data.encrypted });
+          case 'receive': return svg(['L1 bits', 'L2 frame', 'L3 IP', 'L4 TCP', 'L5 session', 'L6 decode', 'L7 data'].map((v, i) => box(25 + i * 124, 44, 112, v, i < 4 ? 'validate' : 'restore', 'packet')).join(''));
+          case 'reassemble': return svg(box(50, 43, 190, `${p.segments.length} segments`, 'ordered by sequence') + line(240, 67, 575, 67) + t(315, 52, data.encrypted ? 'decrypt → decode' : 'decode bytes') + arrow(575, 67) + box(595, 43, 245, 'Original JSON', `${p.raw.length} bytes restored`, 'packet'));
+          case 'delivered': return svg(`<g class="delivered-check">${t(50, 80, '✓', 'font-size="44"')}${t(112, 66, 'MESSAGE DELIVERED', 'font-size="18"')}${label(112, 93, `${p.integrity ? 'SHA-256 matches' : 'INTEGRITY FAILED'} · ${p.raw.length} original bytes`)}</g>` + rect(550, 38, 280, 64) + t(565, 75, short(p.received.body, 29)));
+          default: return packetStrip([], preview);
+        }
+      }
+
+      // On a phone, redraw the information rather than shrinking desktop text to 5 px.
+      function compactDiagram(mode, vpn) {
+        const p = state.pipeline, frame = vpn ? p.vpn.frame : p.direct.frame;
+        const content = p.presentation.encrypted ? 'HTTPS bytes' : 'HTTP bytes';
+        const views = {
+          setup: ['Device', 'Router / ISP', vpn ? 'VPN gateway' : 'Destination'],
+          auth: ['Identity', 'Verify', vpn ? 'Gateway' : 'HTTPS peer'],
+          keys: ['Client', vpn ? 'Tunnel key' : 'TLS key', vpn ? 'Gateway' : 'Destination'],
+          'route-ready': ['Device', vpn ? 'VPN interface' : 'Default route', vpn ? 'Gateway' : 'Destination'],
+          message: ['User request', `${E.utf8(p.app.body).length} bytes`, 'Application'],
+          metadata: [p.app.header.protocol, 'App metadata', 'User data'],
+          json: ['JSON', `${p.raw.length} bytes`, 'FIFO queue'],
+          bytes: ['Text', 'UTF-8', `${p.raw.length} bytes`],
+          compress: [`${p.raw.length} B`, state.compression ? 'RLE' : 'Bypass', `${p.presentation.compressed.length} B`],
+          encrypt: ['App bytes', p.presentation.encrypted ? 'AES-GCM' : 'No encryption', content],
+          hash: ['Original', 'SHA-256', p.hash.slice(0, 9)],
+          session: ['Authorize', 'Session ID', p.session.id.slice(0, 8)],
+          checkpoint: ['Stream', 'Save offset', `${p.session.checkpoints.at(-1)} B`],
+          stream: ['Session', p.session.state, 'Transport'],
+          handshake: ['SYN →', '← SYN-ACK', 'ACK →'],
+          segments: ['Stream', '96 B chunks', `${p.segments.length} segments`],
+          checksum: ['TCP header', `:${p.segments[0].dport}`, 'Checksum ✓'],
+          window: ['Window: 3', 'Send / ACK', 'Retransmit'],
+          inner: ['Inner IP', 'TCP', content],
+          tunnel: vpn ? ['Outer IP', 'UDP 4500', 'Sealed IP…'] : ['IP', 'TCP', content],
+          routing: ['Router', 'Look up IP', vpn ? 'VPN gateway' : 'Destination'],
+          hops: ['NAT router', 'ISP', vpn ? 'VPN gateway' : 'Destination'],
+          fragment: ['IP payload', 'MTU: 100 B', `${E.fragment(vpn ? p.vpn.outer.bytes.slice(20) : p.direct.ip.bytes.slice(20), 100).length} fragments`],
+          mac: ['Device MAC', 'Local link', 'Router MAC'],
+          frame: ['MAC header', vpn ? 'Tunnel IP' : 'Direct IP', 'CRC-32'],
+          crc: ['Frame', 'CRC match ✓', 'Switch port 1'],
+          bits: [`${frame.bytes.length} B`, 'Serialize', `${frame.bytes.length * 8} bits`],
+          tdm: ['A · 1', 'B · 2', 'C · 3'],
+          unwrap: vpn ? ['Tunnel IP', 'Decrypt', 'Inner IP'] : ['ISP', 'Forward', 'Destination'],
+          exit: [vpn ? 'VPN exit IP' : 'Home NAT IP', 'Onward path', 'Destination'],
+          boundary: ['Tunnel ends', p.presentation.encrypted ? 'HTTPS stays' : 'HTTP visible', 'Destination'],
+          receive: ['L1 → L3', 'L4 → L6', 'L7 data'],
+          reassemble: [`${p.segments.length} segments`, 'Decode', 'Original JSON'],
+          delivered: ['Delivered ✓', 'SHA-256 ✓', short(p.received.body, 11)],
+        };
+        if (mode === 'wave' || mode === 'noise') {
+          const b = E.bits(frame.bytes.slice(frame.headerSize + 20)).slice(0, 12), samples = E.encodeSignal(b, state.encoding), w = 320 / samples.length;
+          let d = '', last = 0;
+          samples.forEach((level, i) => { const y = 51 - level * (mode === 'noise' ? 13 : 21), x = 14 + i * w; d += i ? `L${x} ${last}L${x} ${y}` : `M${x} ${y}`; d += `L${x + w} ${y}`; last = y; });
+          return `<svg class="diagram" viewBox="0 0 350 110" role="img" aria-label="${esc(state.encoding)} waveform">${label(14, 15, state.encoding)}${line(14, 51, 334, 51, 'faint')}<path d="${d}" class="stroke"/>${t(14, 98, [...b].join(' '), 'font-size="12"')}</svg>`;
+        }
+        const titles = views[mode] || ['Input', 'Process', 'Output'];
+        const body = titles.map((title, i) => {
+          const x = 6 + i * 116;
+          return rect(x, 30, 105, 43) + t(x + 8, 57, title, 'font-size="11"') + (i < 2 ? arrow(x + 112, 52) : '');
+        }).join('');
+        return `<svg class="diagram" viewBox="0 0 350 110" role="img" aria-label="${esc(titles.join(' → '))}"><g class="packet">${body}</g></svg>`;
+      }
+
+      chapters.forEach((chapter, index) => {
+        const section = document.createElement('section'); section.className = 'chapter'; section.dataset.chapter = chapter.id;
+        section.setAttribute('aria-label', `${chapter.title} comparison`); section.setAttribute('aria-hidden', 'true'); section.inert = true;
+        section.innerHTML = ['vpn', 'direct'].map(lane => `<div class="lane ${lane}"><div class="lane-label"><h3>${lane === 'vpn' ? 'With VPN' : 'Direct'}</h3><p>${lane === 'vpn' ? 'TUNNELLED ROUTE' : 'STANDARD ROUTE'}</p></div><div class="lane-content"><div class="lane-diagram"></div><p class="lane-caption"></p></div></div>`).join('');
+        $('track').append(section);
+        const button = document.createElement('button'); button.innerHTML = `<span>${esc(chapter.number)}</span>${esc(chapter.title)}`;
+        button.setAttribute('aria-label', `Go to ${chapter.title}`); button.addEventListener('click', () => go(index, 0)); $('layer-nav').append(button);
+      });
+      function render() {
+        const chapter = chapters[state.chapter], step = chapter.steps[state.step];
+        $('chapter-kicker').textContent = chapter.number === '00' ? 'BEFORE THE REQUEST / TUNNEL SETUP' : `LAYER ${chapter.number} / ${chapter.unit.toUpperCase()}`;
+        if (state.chapter >= 8) $('chapter-kicker').textContent = chapter.unit.toUpperCase();
+        $('chapter-title').textContent = chapter.title; $('step-title').textContent = step[0]; $('step-caption').textContent = step[1];
+        const sections = [...$('track').children];
+        sections.forEach((section, i) => {
+          const wasActive = section.classList.contains('active'); section.classList.toggle('leaving', wasActive && i !== state.chapter);
+          section.classList.toggle('active', i === state.chapter); section.setAttribute('aria-hidden', String(i !== state.chapter)); section.inert = i !== state.chapter;
+          if (wasActive && i !== state.chapter) setTimeout(() => section.classList.remove('leaving'), 700);
+        });
+        const section = sections[state.chapter];
+        for (const lane of ['vpn', 'direct']) {
+          section.querySelector(`.${lane} .lane-diagram`).innerHTML = diagram(step[4], lane === 'vpn');
+          section.querySelector(`.${lane} .lane-caption`).textContent = step[lane === 'vpn' ? 2 : 3];
+        }
+        $('track').style.transform = `translateX(-${state.chapter * 100}%)`;
+        const current = chapters.slice(0, state.chapter).reduce((n, c) => n + c.steps.length, 0) + state.step + 1;
+        const total = chapters.reduce((n, c) => n + c.steps.length, 0);
+        $('step-count').textContent = `${String(current).padStart(2, '0')} / ${total}`;
+        $('previous').disabled = state.chapter === 0 && state.step === 0;
+        $('next').disabled = state.chapter === chapters.length - 1 && state.step === chapter.steps.length - 1;
+        $('next').title = state.step === chapter.steps.length - 1 && state.chapter < chapters.length - 1 ? `Continue to ${chapters[state.chapter + 1].title}` : 'Next step (→ or Space)';
+        [...$('layer-nav').children].forEach((b, i) => { if (i === state.chapter) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+        $('microsteps').replaceChildren();
+        chapter.steps.forEach((s, i) => {
+          const b = document.createElement('button'); b.className = i === state.step ? 'current' : i < state.step ? 'done' : '';
+          b.setAttribute('aria-label', `${chapter.title}: ${s[0]}`); b.title = s[0]; if (i === state.step) b.setAttribute('aria-current', 'step');
+          b.addEventListener('click', () => go(state.chapter, i)); $('microsteps').append(b);
+        });
+        if ($('inspector').open) fillInspector();
+      }
+      function go(chapter, step) { if (!state.running || state.busy) return; state.chapter = chapter; state.step = step; render(); }
+      function next() {
+        if (!state.running || $('next').disabled) return;
+        if (state.step < chapters[state.chapter].steps.length - 1) go(state.chapter, state.step + 1);
+        else if (state.chapter < chapters.length - 1) go(state.chapter + 1, 0);
+      }
+      function previous() {
+        if (state.step > 0) go(state.chapter, state.step - 1);
+        else if (state.chapter > 0) go(state.chapter - 1, chapters[state.chapter - 1].steps.length - 1);
+      }
+      async function rebuild() {
+        state.pipeline = await E.build($('message').value, { protocol: $('protocol').value, file: state.file, compression: state.compression });
+      }
+      async function start(event) {
+        event?.preventDefault(); if (state.busy) return;
+        state.busy = true; $('start').disabled = true; $('input-error').textContent = '';
+        try {
+          if (!globalThis.crypto?.subtle) throw Error('Web Crypto is unavailable. Open this page at localhost:8000 using “npm start”.');
+          await rebuild(); state.running = true; state.chapter = 0; state.step = 0;
+          $('intro').hidden = true; $('presentation').hidden = false; $('layer-nav').hidden = false; $('inspect').disabled = false;
+          $('skip-link').href = '#presentation';
+          render(); $('next').focus();
+        } catch (error) { $('input-error').textContent = error.message; $('message').focus(); }
+        finally { state.busy = false; $('start').disabled = false; }
+      }
+      function restart() {
+        state.running = false; state.chapter = 0; state.step = 0; $('intro').hidden = false; $('presentation').hidden = true;
+        $('layer-nav').hidden = true; $('inspect').disabled = true; $('start').focus();
+        $('skip-link').href = '#intro';
+      }
+      $('request-form').addEventListener('submit', start); $('next').addEventListener('click', next); $('previous').addEventListener('click', previous); $('restart').addEventListener('click', restart);
+      $('home').addEventListener('click', event => { event.preventDefault(); if (state.running) restart(); else $('message').focus(); });
+      $('file').addEventListener('change', async () => {
+        const file = $('file').files[0]; if (!file) return;
+        const allowed = ['txt', 'json', 'csv', 'png', 'jpg', 'jpeg', 'pdf'];
+        try {
+          if (!allowed.includes(file.name.split('.').at(-1).toLowerCase())) throw Error('Unsupported file type. Use TXT, JSON, CSV, PNG, JPG or PDF.');
+          if (file.size > 8192) throw Error('Use a file up to 8 KiB for a readable demonstration.');
+          if (!file.size) throw Error('The file is empty.');
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          state.file = { name: file.name, type: file.type || 'application/octet-stream', size: file.size };
+          $('message').value = E.base64(bytes); $('message').readOnly = true;
+          $('file-status').textContent = `${short(file.name, 22)} · ${file.size} B`;
+          $('remove-file').hidden = false; $('input-error').textContent = '';
+        } catch (error) { $('input-error').textContent = error.message; $('file').value = ''; }
+      });
+      function removeFile() {
+        if (!state.file) return; state.file = null; $('file').value = ''; $('message').readOnly = false; $('message').value = 'Hello, network.';
+        $('file-status').textContent = 'or use → to step through'; $('remove-file').hidden = true;
+      }
+      $('remove-file').addEventListener('click', removeFile);
+      matchMedia('(max-width:650px)').addEventListener('change', () => { if (state.running) render(); });
+      async function fullscreen() { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { $('fullscreen').title = 'Fullscreen is not available in this browser.'; } }
+      $('fullscreen').addEventListener('click', fullscreen);
+
+      function updateThemeButton() {
+        const btn = $('theme-toggle');
+        if (!btn) return;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        btn.textContent = isDark ? 'Light' : 'Dark';
+        btn.setAttribute('aria-label', isDark ? 'Switch to light theme' : 'Switch to dark theme');
+        btn.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+      }
+      function toggleTheme() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const nextTheme = isDark ? 'light' : 'dark';
+        if (nextTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        else document.documentElement.removeAttribute('data-theme');
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', nextTheme === 'dark' ? '#141715' : '#ffffff');
+        try { localStorage.setItem('theme', nextTheme); } catch (_) { }
+        updateThemeButton();
+      }
+      if ($('theme-toggle')) {
+        $('theme-toggle').addEventListener('click', toggleTheme);
+        updateThemeButton();
+      }
+      document.addEventListener('keydown', event => {
+        if ($('inspector').open || event.altKey || event.ctrlKey || event.metaKey || event.repeat || /^(TEXTAREA|INPUT|SELECT)$/.test(event.target.tagName)) return;
+        if (event.key.toLowerCase() === 'f') { event.preventDefault(); fullscreen(); }
+        if (event.key === 'ArrowRight' || (event.code === 'Space' && event.target.tagName !== 'BUTTON')) { event.preventDefault(); state.running ? next() : start(); }
+        if (event.key === 'ArrowLeft' && state.running) { event.preventDefault(); previous(); }
+      });
+
+      function liveData() {
+        const p = state.pipeline, sample = p.segments[0], v = p.vpn, d = p.direct;
+        switch (chapters[state.chapter].id) {
+          case 'connect': return { endpoint: v.outer.dst, tunnel: 'Illustrative L3 UDP tunnel', cipher: 'AES-256-GCM', keys: 'fresh, in-memory, non-extractable', route: '0.0.0.0/0 → virtual VPN interface (conceptual)', applicationProtocol: p.app.header.protocol };
+          case 'application': return p.app;
+          case 'presentation': return { teachingHeader: { encoding: 'UTF-8', compression: p.presentation.compression, encryption: p.presentation.encrypted ? 'AES-256-GCM (illustrative HTTPS content protection)' : 'none (HTTP)' }, originalBytes: p.raw.length, compressedBytes: p.presentation.compressed.length, payloadBytes: p.presentation.payload.length, base64: short(p.presentation.base64, 250), sha256: p.hash };
+          case 'session': return { teachingHeader: { id: p.session.id, state: p.session.state, checkpoints: p.session.checkpoints }, token: p.session.token, note: 'Application/session teaching model, not a literal wire header or VPN session.' };
+          case 'transport': return { handshake: p.handshake, segmentCount: p.segments.length, firstSegment: { sourcePort: sample.sport, destinationPort: sample.dport, seq: sample.seq, ack: sample.ack, timestamp: sample.timestamp, timestampNote: 'Teaching metadata, not a TCP timestamp option in this 20-byte header', checksum: `0x${sample.checksum.toString(16)}`, valid: E.validSegment(sample), bytes: sample.data.length }, window: 3, note: 'Internet-style ones-complement checksum over modeled TCP header + payload; pseudo-header omitted.' };
+          case 'network': return { inner: { src: d.ip.src, dst: d.ip.dst, ttl: d.ip.ttl, bytes: d.ip.bytes.length }, outer: { src: v.outer.src, dst: v.outer.dst, protocol: 'UDP / 17', bytes: v.outer.bytes.length }, directOptimalRoute: p.route, manualTable: routingTable, hopTrace: p.trace };
+          case 'link': return { destinationMAC: d.frame.dst, sourceMAC: d.frame.src, direct: { bytes: d.frame.bytes.length, crc: E.hex(d.frame.bytes.slice(-4)), valid: E.validFrame(d.frame) }, vpn: { bytes: v.frame.bytes.length, crc: E.hex(v.frame.bytes.slice(-4)), valid: E.validFrame(v.frame) }, frameHexPreview: E.hex(v.frame.bytes.slice(0, 96)), note: 'No preamble, padding or inter-frame gap. Bit stuffing and CSMA/CD are separate media experiments.' };
+          case 'physical': return { encoding: state.encoding, directBits: d.frame.bytes.length * 8, vpnBits: v.frame.bytes.length * 8, first128Bits: E.bits(v.frame.bytes).slice(0, 128), voltageModel: 'NRZ: 0 = -1, 1 = +1. Manchester: 0 = low/high, 1 = high/low. NRZI: 1 changes level.', BER: 0, topology: 'Local switched star → routed backbone → destination star' };
+          case 'gateway': return { gateway: v.outer.dst, outerBytes: v.outer.bytes.length, innerBytes: d.ip.bytes.length, removedOverhead: v.outer.bytes.length - d.ip.bytes.length, egressSource: '203.0.113.7 (modeled exit NAT)', directSource: E.nat({ src: d.ip.src, sport: sample.sport }), onwardContentEncrypted: p.presentation.encrypted, note: 'The VPN gateway can see the inner destination. It does not remove HTTPS protection.' };
+          case 'receiver': return { received: p.received, integrity: p.integrity, sha256: p.hash, segmentsReassembled: p.segments.length, framesValidated: p.vpn.packets.length + p.direct.frames.length, encapsulation: encapsulation(p), sessionState: p.session.state };
+        }
+      }
+      const routingTable = [{ prefix: '203.0.113.0', bits: 24, via: 'ISP edge' }, { prefix: '192.168.1.0', bits: 24, via: 'LAN' }, { prefix: '0.0.0.0', bits: 0, via: 'default router' }];
+      function encapsulation(p) {
+        return [
+          ['Application', 'JSON + teaching metadata', p.raw.length],
+          ['Presentation', p.presentation.encrypted ? 'AES-GCM content' : 'HTTP content', p.presentation.payload.length],
+          ['Session', 'endpoint metadata; no extra wire bytes', p.presentation.payload.length],
+          ['Transport', '20-byte modeled TCP header', p.segments[0].data.length + 20],
+          ['Network / direct', '20-byte IPv4 header', p.direct.ip.bytes.length],
+          ['Network / VPN', 'outer IPv4 + UDP + IV + auth tag', p.vpn.outer.bytes.length],
+          ['Link / VPN', '14-byte Ethernet header + 4-byte CRC', p.vpn.frame.bytes.length],
+          ['Physical / VPN', 'binary bits, not bytes', p.vpn.frame.bytes.length * 8],
+        ];
+      }
+      function output(value, visual = '') {
+        $('lab-result').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+        $('lab-visual').innerHTML = visual;
+      }
+      function frameFault() {
+        const original = state.pipeline.vpn.frame, bad = { ...original, bytes: original.bytes.slice() };
+        const index = 14 + crypto.getRandomValues(new Uint8Array(1))[0] % Math.max(1, bad.bytes.length - 18);
+        bad.bytes[index] ^= 1;
+        return { bad, index, validBefore: E.validFrame(original), validAfter: E.validFrame(bad), ber: E.ber(E.bits(original.bytes), E.bits(bad.bytes)) };
+      }
+      const actions = {
+        connect: [
+          ['Verify authentication', () => { let rejected = false; try { new E.Session(false); } catch { rejected = true; } output(`Unauthorized client: ${rejected ? 'REJECTED' : 'ACCEPTED'}\nAuthorized client: ${new E.Session(true).state.toUpperCase()}\nNo network connection is made.`, diagram('auth', true)); }],
+          ['Generate fresh keys', async () => { const b = E.utf8('gateway authentication test'), s = await E.seal(b); output(`Fresh AES-256-GCM key generated (non-extractable).\nIV: ${E.hex(s.iv)}\nCiphertext: ${E.hex(s.data)}\nDecrypted: ${E.text(await E.open(s))}`, diagram('keys', true)); }],
+          ['Show tunnel route', () => output('Conceptual route installation:\n0.0.0.0/0 → virtual interface → tunnel gateway\nGateway 203.0.113.7 retains a route via the real interface to avoid a routing loop.\nOnly the client-to-gateway leg is tunnel-protected.', diagram('route-ready', true))],
+        ],
+        application: [
+          ['Queue a second message', () => { queue.enqueue(E.application(`Queued request ${queue.items.length + 1}`, { protocol: state.pipeline.app.header.protocol })); output({ queue: queue.items.map(x => x.body), count: queue.items.length, behavior: 'FIFO: dequeue sends the oldest request.' }, diagram('json', true)); }],
+          ['Send queued message', () => { const sent = queue.dequeue(); output(sent ? { sent, remaining: queue.items.length, presentationInputBytes: E.utf8(JSON.stringify(sent)).length } : 'Queue empty. Add a message first.', diagram('json', true)); }],
+          ['Validate invalid input', () => { try { E.application(' '); } catch (e) { output(`REJECTED: ${e.message}\nFile input also rejects unsupported extensions, empty files and files over 8 KiB.\nValid JSON message: ${JSON.stringify(state.pipeline.app.header)}`); } }],
+          ['Forward to presentation', () => output({ validated: true, nextLayer: 'Presentation', bytes: E.utf8(JSON.stringify(state.pipeline.app)).length, json: state.pipeline.app }, diagram('bytes', true))],
+        ],
+        presentation: [
+          ['Encode / decode Base64', () => { const b = state.pipeline.raw, encoded = E.base64(b); output({ encoding: 'Base64 (not encryption)', encoded: short(encoded, 200), decodedMatches: E.hex(E.unbase64(encoded)) === E.hex(b), utf8Bytes: b.length }, diagram('bytes', true)); }],
+          ['Toggle RLE compression', async () => { state.compression = !state.compression; await rebuild(); render(); output({ enabled: state.compression, before: state.pipeline.raw.length, after: state.pipeline.presentation.compressed.length, roundTrip: E.hex(E.unrle(E.rle(state.pipeline.raw))) === E.hex(state.pipeline.raw), note: 'Optional educational compression before encryption, not TLS compression.' }, diagram('compress', true)); }],
+          ['Encrypt / decrypt AES', async () => { const b = state.pipeline.raw, s = await E.seal(b); output({ algorithm: 'AES-256-GCM', plaintextBytes: b.length, ciphertextAndTagBytes: s.data.length, nonceBytes: s.iv.length, ciphertext: short(E.hex(s.data), 160), decryptedMatches: E.hex(await E.open(s)) === E.hex(b) }, diagram('encrypt', true)); }],
+          ['Tamper with ciphertext', async () => { const s = await E.seal(state.pipeline.raw); s.data[0] ^= 1; try { await E.open(s); output('FAILED: tamper accepted'); } catch { output('REJECTED: AES-GCM authentication tag does not match.\nModified ciphertext cannot be decrypted successfully.'); } }],
+          ['Binary ↔ text', () => { const b = state.pipeline.raw.slice(0, 24); output({ utf8: E.text(b), bits: E.bits(b), decoded: E.text(E.fromBits(E.bits(b))) }); }],
+          ['Verify SHA-256', async () => output({ expected: state.pipeline.hash, actual: await E.sha256(state.pipeline.raw), match: await E.sha256(state.pipeline.raw) === state.pipeline.hash }, diagram('hash', true))],
+        ],
+        session: [
+          ['Interrupt / recover', () => { const s = state.pipeline.session; s.state = 'interrupted'; const offset = s.recover(); output(`Session interrupted.\nRecovered session ${s.id}\nResume offset: ${offset} bytes (last checkpoint)\nState: ${s.state}`, diagram('checkpoint', true)); }],
+          ['Simulate idle timeout', () => { const s = state.pipeline.session; const expired = s.expire(30001, 30000); output(`Inactivity: 30,001 ms\nTimeout: 30,000 ms\nExpired: ${expired}\nState: ${s.state}`); }],
+          ['Start concurrent sessions', () => { const sessions = [new E.Session(true), new E.Session(true), new E.Session(true)]; output(sessions.map(s => ({ id: s.id, state: s.state, independentToken: s.token })), diagram('session', true)); }],
+          ['Check synchronization token', () => { const s = state.pipeline.session; s.recover(); output({ validToken: s.sync(s.token), invalidToken: s.sync('incorrect-token'), authenticated: true }); }],
+          ['Teardown / initiate', () => { const s = state.pipeline.session; s.close(); const old = s.id; state.pipeline.session = new E.Session(true); output({ closedSession: old, oldState: s.state, newSession: state.pipeline.session.id, newState: state.pipeline.session.state }); }],
+        ],
+        transport: [
+          ['Three-way handshake', () => output(state.pipeline.handshake.join('\n'), diagram('handshake', true))],
+          ['Drop a segment', () => { const tx = E.transfer(state.pipeline.segments, { lost: 0 }); output({ events: tx.events.slice(0, 18), retransmissions: tx.retries, reassembledMatches: E.hex(E.reassemble(tx.received)) === E.hex(state.pipeline.presentation.payload) }, segmentsDiagram(state.pipeline, true)); }],
+          ['Corrupt TCP checksum', () => { const p = state.pipeline, s = { ...p.segments[0], data: p.segments[0].data.slice() }; s.data[0] ^= 1; const tx = E.transfer(p.segments, { corrupt: 0 }); output({ corruptedSegmentAccepted: E.validSegment(s), recovery: tx.events.slice(0, 9), retransmissions: tx.retries, finalStreamValid: E.hex(E.reassemble(tx.received)) === E.hex(p.presentation.payload) }, diagram('checksum', true)); }],
+          ['Sliding window / ACKs', () => output(E.transfer(state.pipeline.segments, { window: 3 }).events.slice(0, 24), segmentsDiagram(state.pipeline, true))],
+          ['Reassemble out of order', () => output({ arrivalSequence: [...state.pipeline.segments].reverse().map(s => s.seq), restored: E.hex(E.reassemble([...state.pipeline.segments].reverse())) === E.hex(state.pipeline.presentation.payload) }, diagram('reassemble', true))],
+        ],
+        network: [
+          ['Routing table lookup', () => output({ destination: '203.0.113.80', match: E.lookup('203.0.113.80', routingTable), table: routingTable, policy: 'Longest matching prefix wins.' }, diagram('routing', false))],
+          ['Dijkstra optimal route', () => output({ graph: E.graph, selected: E.route(E.graph, 'Client', 'Destination') }, routeDiagram(E.route(E.graph, 'Client', 'Destination').path, 2))],
+          ['Fail a relay / reroute', () => { const r = E.route(E.graph, 'Client', 'Destination', ['Relay']); output({ failedNode: 'Relay', before: state.pipeline.route, after: r }, routeDiagram(r.path, 2)); }],
+          ['Expire TTL', () => output({ initialTTL: 1, result: E.trace(state.pipeline.route.path, 1), outcome: 'Discard at Router; simulated ICMP time exceeded.' }, diagram('hops', false))],
+          ['Fragment / reassemble', () => { const bytes = state.pipeline.vpn.outer.bytes.slice(20), f = E.fragment(bytes, 100); output({ mtu: 100, fragments: f.map(x => ({ offsetBytes: x.offset, ipv4OffsetUnits: x.offset / 8, moreFragments: x.more, payloadBytes: x.data.length })), reassembled: E.hex(E.defragment([...f].reverse())) === E.hex(bytes) }, diagram('fragment', true)); }],
+          ['NAT translation', () => { const packet = { src: '192.168.1.10', sport: 51514, dst: '203.0.113.80', dport: state.pipeline.segments[0].dport }; output({ before: packet, after: E.nat(packet), reverseMapping: '198.51.100.24:62001 → 192.168.1.10:51514' }, diagram('exit', false)); }],
+          ['Destination unreachable', () => output({ blocked: ['Relay', 'Gateway', 'Destination'], route: E.route(E.graph, 'Client', 'Destination', ['Relay', 'Gateway', 'Destination']), outcome: 'No route: destination unreachable. Packet is not forwarded.' })],
+          ['Traceroute', () => output(state.pipeline.trace, diagram('hops', false))],
+        ],
+        link: [
+          ['Flip a frame bit / CRC', () => { const f = frameFault(); output({ flippedByte: f.index, beforeCRC: f.validBefore, afterCRC: f.validAfter, BER: f.ber, result: 'Damaged frame discarded. TCP must recover the missing data.' }, diagram('crc', true)); }],
+          ['Bit stuff / unstuff', () => { const original = E.bits(state.pipeline.vpn.frame.bytes); const stuffed = E.stuff(original); output({ originalBits: original.length, stuffedBits: stuffed.length, restoredExactly: E.unstuff(stuffed) === original, example: { input: '01111110', stuffed: E.stuff('01111110'), rule: 'Insert 0 after five 1s. HDLC-style example, not Ethernet encoding.' } }); }],
+          ['Shared-medium collision', () => output({ startsInSlot: [0, 0], ...E.collision([0, 0]), note: 'CSMA/CD teaching simulation: detect simultaneous transmitters, then back off to different slots. Modern switched full-duplex Ethernet does not use collisions.' })],
+          ['Switch MAC lookup', () => { const table = { '02:00:00:00:00:01': 1, '02:00:00:00:00:0a': 2 }; output({ table, destination: state.pipeline.vpn.frame.dst, forwardingPort: E.switchPort(state.pipeline.vpn.frame.dst, table), unknownMAC: E.switchPort('02:ff:00:00:00:00', table) }, diagram('mac', true)); }],
+          ['Tag VLAN 42', () => { const f = E.frame(state.pipeline.vpn.outer.bytes, 42); output({ vlan: f.vlan, etherType: '0x8100', TCI: '0x002a', headerBytes: f.headerSize, frameBytes: f.bytes.length, crcValid: E.validFrame(f), extraBytes: f.bytes.length - state.pipeline.vpn.frame.bytes.length }, packetStrip(['MACs', 'VLAN 42', 'Type'], 'outer IP · encrypted payload · CRC')); }],
+        ],
+        physical: [
+          ...['NRZ', 'Manchester', 'NRZI'].map(encoding => [encoding, () => { state.encoding = encoding; output({ encoding, samples: E.encodeSignal(E.bits(state.pipeline.vpn.frame.bytes.slice(34)).slice(0, 24), encoding) }, waveDiagram(E.bits(state.pipeline.vpn.frame.bytes.slice(34)), encoding)); }]),
+          ['Inject noise / measure BER', () => { const f = frameFault(); output({ randomFlippedByte: f.index, alteredBits: 1, totalBits: f.bad.bytes.length * 8, BER: f.ber, crcAccepted: f.validAfter, outcome: 'CRC detected the damaged frame.' }, waveDiagram(E.bits(f.bad.bytes.slice(f.bad.headerSize + 20)))); }],
+          ['Attenuate over 100 m', () => { const a = E.attenuate(1, 100); output({ initialAmplitude: 1, distanceMeters: 100, attenuationDbPerMeter: .02, receivedAmplitude: a, model: 'Amplitude = A × 10^(−dB/20)' }, waveDiagram(E.bits(state.pipeline.vpn.frame.bytes.slice(34)), state.encoding, a)); }],
+          ['Interleave TDM channels', () => output({ channels: ['ABCD', '1234'], slots: E.tdm(['ABCD', '1234']), demultiplexed: ['ABCD', '1234'] }, diagram('tdm', true))],
+          ['Show hybrid topology', () => output(E.hybridTopology(), routeDiagram(['LAN star', 'Router', 'Backbone', 'Router', 'Server star'], 2))],
+        ],
+        gateway: [
+          ['Decrypt inner packet', async () => { const p = state.pipeline.vpn.packets[0], bytes = await E.open(p.encrypted); output({ outerBytes: p.outer.bytes.length, decryptedInnerBytes: bytes.length, matchesOriginal: E.hex(bytes) === E.hex(p.inner.bytes), innerDestination: p.inner.dst, innerHeader: E.hex(bytes.slice(0, 20)) }, diagram('unwrap', true)); }],
+          ['Compare observer visibility', () => output({ localISP_VPN: 'Gateway IP 203.0.113.7, timing and traffic volume. Inner IP and payload are tunnel-encrypted.', localISP_Direct: 'Destination IP 203.0.113.80, timing and volume. HTTPS content remains encrypted.', vpnProvider: 'Your source IP and inner destination. HTTPS content stays encrypted; HTTP content is readable.', destination: { vpn: '203.0.113.7', direct: '198.51.100.24' }, warning: 'VPN is not anonymity. DNS routing, split tunneling and browser tracking are outside this full-tunnel IP example.' }, diagram('boundary', true))],
+        ],
+        receiver: [
+          ['Run verification', verifyPipeline],
+          ['Encapsulation table', () => output(encapsulation(state.pipeline).map(([layer, header, n]) => `${layer.padEnd(20)} ${String(n).padStart(5)} ${layer.startsWith('Physical') ? 'bits' : 'B'} · ${header}`).join('\n') + '\n\nTransport onward shows the first segment, not the entire multi-frame transfer.')],
+          ['Verify failed transmission', async () => { const p = state.pipeline, f = frameFault(); const s = { ...p.segments[0], data: p.segments[0].data.slice() }; s.data[0] ^= 1; let incomplete = false; try { E.reassemble(p.segments.slice(1)); } catch { incomplete = true; } output({ frameCorruptionRejected: !E.validFrame(f.bad), tcpCorruptionRejected: !E.validSegment(s), missingSegmentRejected: incomplete, result: 'PASS · damaged or incomplete traffic is not delivered as successful.' }); }],
+          ['Close session', () => { state.pipeline.session.close(); output({ session: state.pipeline.session.id, state: state.pipeline.session.state, messageDelivered: state.pipeline.integrity }, diagram('delivered', true)); }],
+          ['Download received data', downloadReceived],
+        ],
+      };
+      async function verifyPipeline() {
+        const p = state.pipeline, recovered = await E.build(p.app.body, { protocol: p.app.header.protocol, file: state.file, compression: state.compression });
+        const tx = E.transfer(p.segments, { lost: 0 });
+        const checks = [['VPN and direct receiver round trip', recovered.received.body === p.app.body && recovered.integrity], ['All link CRCs valid', p.direct.frames.every(E.validFrame) && p.vpn.packets.every(v => E.validFrame(v.frame))], ['IPv4 headers valid', p.direct.packets.every(v => E.validIP(v.bytes)) && p.vpn.packets.every(v => E.validIP(v.outer.bytes))], ['All TCP checksums valid', p.segments.every(E.validSegment)], ['Out-of-order reassembly', E.hex(E.reassemble([...p.segments].reverse())) === E.hex(p.presentation.payload)], ['Loss and retransmission recovery', tx.retries === 1 && E.hex(E.reassemble(tx.received)) === E.hex(p.presentation.payload)], ['Noise rejected at link', !frameFault().validAfter], ['Application hash matches', await E.sha256(p.raw) === p.hash]];
+        output(checks.map(([name, passed]) => `${passed ? 'PASS' : 'FAIL'} · ${name}`).join('\n'), diagram('delivered', true));
+      }
+      function downloadReceived() {
+        const app = state.pipeline.received, isFile = !!app.header.filename;
+        const blob = new Blob([isFile ? E.unbase64(app.body) : app.body], { type: isFile ? 'application/octet-stream' : 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = isFile ? app.header.filename : 'received-message.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        output(`Verified receiver data downloaded: ${a.download}\n${blob.size} original content bytes. Uploaded files are never executed or rendered.`);
+      }
+      function fillInspector() {
+        const chapter = chapters[state.chapter]; $('inspect-title').textContent = chapter.title;
+        $('inspect-note').textContent = chapters[state.chapter].steps[state.step][1] + ' These controls run on the current request; nothing is transmitted.';
+        $('inspect-data').textContent = JSON.stringify(liveData(), null, 2);
+        $('assignment-checklist').replaceChildren();
+        for (const requirement of Coverage[chapter.id]) {
+          const item = document.createElement('li'); item.textContent = requirement; $('assignment-checklist').append(item);
+        }
+        $('experiments').replaceChildren(); $('lab-result').textContent = ''; $('lab-visual').innerHTML = '';
+        for (const [name, run] of actions[chapter.id]) {
+          const button = document.createElement('button'); button.textContent = name;
+          button.addEventListener('click', async () => {
+            if (state.busy) return; state.busy = true; button.disabled = true;
+            try { await run(); $('inspect-data').textContent = JSON.stringify(liveData(), null, 2); }
+            catch (error) { output(`Experiment failed: ${error.message}`); }
+            finally { state.busy = false; button.disabled = false; }
+            [...$('experiments').children].forEach(b => b.classList.toggle('selected', b.textContent === name));
+          }); $('experiments').append(button);
+        }
+      }
+      $('inspect').addEventListener('click', () => { fillInspector(); $('inspector').showModal(); });
+      $('close-inspector').addEventListener('click', () => $('inspector').close());
+      $('inspector').addEventListener('click', event => { if (event.target === $('inspector')) { const r = $('inspector').getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) $('inspector').close(); } });
+      // A concise live announcement avoids having two entire SVG lanes read after every click.
+      $('step-title').setAttribute('aria-live', 'polite'); $('step-title').setAttribute('aria-atomic', 'true');
+    })();
+
+  </script>
+</body>
+
+</html>
