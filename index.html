@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Follow one request through all seven OSI layers. A minimal, step-by-step comparison of a VPN tunnel and a direct network.">
+  <title>Packet / Path — VPN Visualizer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23141715'/%3E%3Cpath d='M7 11h18M7 21h18' stroke='%239edbb7' stroke-width='3'/%3E%3C/svg%3E">
+  <script>
+    try { if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (_) {}
+  </script>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="engine.js"></script>
+  <script defer src="story.js"></script>
+  <script defer src="coverage.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a id="skip-link" class="skip-link" href="#intro">Skip to visualization</a>
+  <div class="shell">
+    <header class="topbar">
+      <a id="home" class="brand" href="#intro" aria-label="Packet Path home">packet <span>/</span> path<span class="brand-note">COMPUTER NETWORKS</span></a>
+      <div class="top-actions"><span class="simulation">OFFLINE SIMULATION</span><button id="theme-toggle" aria-label="Toggle dark/light theme" title="Toggle dark/light theme">Dark</button><button id="inspect" disabled>Inspect layer <span aria-hidden="true">↗</span></button><button id="fullscreen" aria-label="Toggle fullscreen" title="Fullscreen (F)">⛶</button></div>
+    </header>
+
+    <main id="intro" class="intro" tabindex="-1">
+      <div class="intro-copy"><p class="eyebrow">ONE REQUEST. TWO ROUTES.</p><h1>What happens<br>when you connect?</h1><p class="intro-description">Follow a packet through all seven OSI layers.<br>A VPN above. A direct connection below. One step at a time.</p>
+        <form id="request-form">
+          <label for="message" class="eyebrow">YOUR REQUEST</label>
+          <textarea id="message" name="message" autocomplete="off" aria-label="Your message" aria-describedby="input-error" rows="2" maxlength="16000" spellcheck="false">Hello, network.</textarea>
+          <div class="input-options"><select id="protocol" name="protocol" aria-label="Request protocol"><option value="HTTPS">HTTPS · encrypted content</option><option value="HTTP">HTTP · visible content</option></select><label class="file-label">Attach file <input id="file" name="file" type="file" aria-label="Upload a file" accept=".txt,.json,.csv,.png,.jpg,.jpeg,.pdf"></label><button id="remove-file" type="button" hidden>Remove file</button></div>
+          <div class="start-row"><button type="submit" id="start" class="primary">Start <span aria-hidden="true">→</span></button><span id="file-status">or use → to step through</span></div>
+          <p id="input-error" class="error" role="alert"></p>
+        </form>
+      </div>
+      <div class="intro-figure" aria-label="The same user request takes a VPN route above and a direct route below">
+        <div class="origin-label">YOUR DEVICE</div><div class="origin-mark"><span></span><span></span><span></span></div>
+        <div class="intro-route vpn"><span class="route-label">WITH VPN</span><div class="intro-line"><span class="intro-packet">request</span><span class="gateway-mark">VPN</span><span class="endpoint">↗</span></div><p>Through an encrypted tunnel.</p></div>
+        <div class="intro-route direct"><span class="route-label">DIRECT</span><div class="intro-line"><span class="intro-packet">request</span><span class="endpoint">↗</span></div><p>Straight to the destination.</p></div>
+        <p class="figure-note">Same destination. Different visibility.</p>
+      </div>
+      <div class="intro-bottom"><span>A layer-by-layer visual study</span><span>7 layers <span class="divider">/</span> 2 paths <span class="divider">/</span> You set the pace</span></div>
+    </main>
+
+    <main id="presentation" tabindex="-1" hidden>
+      <section class="chapter-heading"><div><p id="chapter-kicker" class="eyebrow"></p><h1 id="chapter-title"></h1></div><div class="heading-description"><h2 id="step-title"></h2><p id="step-caption"></p></div></section>
+      <div id="viewport" class="viewport"><div id="track" class="track"></div></div>
+      <footer class="controls"><div class="control-left"><button id="restart" title="Return to request">Restart</button><span id="step-count" class="mono"></span></div><div id="microsteps" class="microsteps" aria-label="Steps in this layer"></div><div class="navigation"><button id="previous" aria-label="Previous">← <span>Previous</span></button><button id="next" class="primary" aria-label="Next"><span>Next</span> →</button></div></footer>
+    </main>
+    <nav id="layer-nav" class="layer-nav" aria-label="Layer navigation" hidden></nav>
+    <div class="bottom-note"><span>Educational model · no real traffic leaves this page</span><span id="keyboard-note">← → navigate <span class="divider">/</span> F fullscreen</span></div>
+  </div>
+
+  <dialog id="inspector" aria-labelledby="inspect-title">
+    <header class="inspect-header"><div><p class="eyebrow">UNDER THE HOOD</p><h2 id="inspect-title"></h2></div><button id="close-inspector" aria-label="Close inspector">Close ×</button></header>
+    <p id="inspect-note" class="inspect-note"></p>
+    <h3>Live data</h3><pre id="inspect-data"></pre>
+    <h3>Try it</h3><div id="experiments" class="experiments"></div><div id="lab-visual"></div><pre id="lab-result" role="status" aria-live="polite"></pre>
+    <details><summary>Assignment checklist · this layer</summary><ol id="assignment-checklist" class="assignment-checklist"></ol></details>
+    <details><summary>Model boundaries & references</summary><p>All OSI layers are illustrated; real Internet protocols span layers. Application, presentation and session headers are teaching metadata. AES-256-GCM and SHA-256 run locally with Web Crypto. The VPN uses a simplified UDP-encapsulated L3 tunnel, not an interoperable IPsec or WireGuard implementation. TCP checksums omit the IP pseudo-header. Frames omit preamble, minimum-size padding and inter-frame gaps. NRZ/Manchester/NRZI, bit stuffing, VLAN and shared-Ethernet collision experiments illustrate different media, not one Ethernet specification. The initial secure key negotiation is a conceptual animation, not an implemented key-exchange protocol.</p><p>References: <a href="https://www.rfc-editor.org/rfc/rfc4301" target="_blank" rel="noreferrer">RFC 4301 · IPsec architecture</a>, <a href="https://www.rfc-editor.org/rfc/rfc9293" target="_blank" rel="noreferrer">RFC 9293 · TCP</a>, <a href="https://www.rfc-editor.org/rfc/rfc8446" target="_blank" rel="noreferrer">RFC 8446 · TLS</a>. Task mapping: docs/coverage.md.</p></details>
+  </dialog>
+  <noscript>This visualizer needs JavaScript. Enable it, then reopen this page. It runs entirely on your device.</noscript>
+</body>
+</html>
