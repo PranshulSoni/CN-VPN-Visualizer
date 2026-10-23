@@ -1,0 +1,16 @@
+{
+  "name": "cn-vpn-visualizer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An offline, step-by-step OSI and VPN comparison",
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "test": "node --test tests/engine.test.cjs",
+    "start": "python3 -m http.server 8000",
+    "test:browser": "npm run build && playwright test",
+    "test:all": "npm test && npm run test:browser"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
+}
